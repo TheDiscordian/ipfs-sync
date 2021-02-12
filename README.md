@@ -3,9 +3,11 @@
 
 Note: This software is very young. If you discover any bugs, please report them via the issue tracker.
 
-`ipfs-sync` is a simple daemon which will watch files on your filesystem, mirror them to MFS, automatically update related pins, and update an IPNS key, so you can always access your directories from the same address. You can use it to sync your documents, photos, videos, or even a website!
+`ipfs-sync` is a simple daemon which will watch files on your filesystem, mirror them to MFS, automatically update related pins, and update related IPNS keys, so you can always access your directories from the same address. You can use it to sync your documents, photos, videos, or even a website!
 
 ## Installation
+
+You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be added to your `$PATH` to execute the command. Binaries will be released in the near future, removing these requirements.
 
 `go install github.com/TheDiscordian/ipfs-sync`
 
