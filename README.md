@@ -13,7 +13,7 @@ You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be add
 
 ## Usage
 
-The only required parameters is `dirs`, which can be specified in the config file, or as an argument.
+The only required parameter is `dirs`, which can be specified in the config file, or as an argument.
 
 ```
 Usage of ipfs-sync:
