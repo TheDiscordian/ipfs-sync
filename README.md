@@ -1,13 +1,14 @@
 # ipfs-sync
 [![Go Reference](https://pkg.go.dev/badge/github.com/TheDiscordian/ipfs-sync.svg)](https://pkg.go.dev/github.com/TheDiscordian/ipfs-sync)
-
-Note: This software is very young. If you discover any bugs, please report them via the issue tracker.
+*Note: This software is very young. If you discover any bugs, please report them via the issue tracker.*
 
 `ipfs-sync` is a simple daemon which will watch files on your filesystem, mirror them to MFS, automatically update related pins, and update related IPNS keys, so you can always access your directories from the same address. You can use it to sync your documents, photos, videos, or even a website!
 
 <a href="https://www.buymeacoffee.com/trdiscordian" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
 ## Installation
+
+*Note: These steps are only needed to install from source. If you'd rather a binary, head over to the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) and simply download a release for your OS.*
 
 You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be added to your `$PATH` to execute the command. Binaries will be released in the near future, removing these requirements.
 
