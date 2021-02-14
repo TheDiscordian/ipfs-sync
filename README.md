@@ -23,14 +23,16 @@ Usage of ipfs-sync:
         relative MFS directory path (default "/ipfs-sync/")
   -config string
         path to config file to use
+  -copyright
+        display copyright and exit
+  -db string
+        path to file where db should be stored (example: "/home/user/.ipfs-sync/hashes.db")
   -dirs value
         set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/"},{"ID":"Example2", "Dir":"/home/user/Pictures/"}]
   -endpoint string
         node to connect to over HTTP (default "http://127.0.0.1:5001")
   -ignore value
         set the suffixes to ignore (default: ["kate-swp", "swp", "part"])
-  -copyright
-        display copyright and exit
   -sync duration
         time to sleep between IPNS syncs (ex: 120s) (default 10s)
 ```
