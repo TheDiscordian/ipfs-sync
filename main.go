@@ -40,11 +40,13 @@ var (
 	ConfigFile     string
 	IgnoreFlag     = new(IgnoreStruct)
 	Ignore         []string
-	LicenseFlag    = flag.Bool("license", false, "display license and exit")
+	LicenseFlag    = flag.Bool("copyright", false, "display copyright and exit")
+	DBPathFlag     = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync/hashes.db")`)
+	DBPath         string
 )
 
 func init() {
-	flag.Var(DirKeysFlag, "dirs", `set the dirs to monitor in json format like: [{"Key":"Example1", "Dir":"/home/user/Documents/"},{"Key":"Example2", "Dir":"/home/user/Pictures/"}]`)
+	flag.Var(DirKeysFlag, "dirs", `set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/"},{"ID":"Example2", "Dir":"/home/user/Pictures/"}]`)
 	flag.Var(IgnoreFlag, "ignore", `set the suffixes to ignore (default: ["kate-swp", "swp", "part"])`)
 }
 
@@ -113,6 +115,15 @@ func watchDir(dir string) chan bool {
 						if repl != "" {
 							log.Println(repl)
 						}
+						if Hashes != nil {
+							HashLock.Lock()
+							if Hashes[event.Name] != nil {
+								Hashes[event.Name].Recalculate(event.Name)
+							} else {
+								Hashes[event.Name] = new(FileHash).Recalculate(event.Name)
+							}
+							HashLock.Unlock()
+						}
 						continue
 					}
 					if err := filepath.Walk(event.Name, watchThis); err != nil {
@@ -126,10 +137,25 @@ func watchDir(dir string) chan bool {
 					if repl != "" {
 						log.Println(repl)
 					}
+					if Hashes != nil {
+						HashLock.Lock()
+						if Hashes[event.Name] != nil {
+							Hashes[event.Name].Recalculate(event.Name)
+						} else {
+							Hashes[event.Name] = new(FileHash).Recalculate(event.Name)
+						}
+						HashLock.Unlock()
+					}
 				case fsnotify.Remove, fsnotify.Rename:
 					err := RemoveFile(dirName + "/" + event.Name[len(dir):])
 					if err != nil {
 						log.Println("ERROR", err)
+					}
+					if Hashes != nil {
+						HashLock.Lock()
+						Hashes[event.Name].Delete()
+						delete(Hashes, event.Name)
+						HashLock.Unlock()
 					}
 				}
 			case err, ok := <-watcher.Errors:
@@ -217,6 +243,10 @@ func AddDir(path string) (string, error) {
 		return "", err
 	}
 	for _, file := range files {
+		splitName := strings.Split(file, ".")
+		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
+			continue
+		}
 		repl, err := AddFile(file, dirName+"/"+file[len(path):])
 		if err != nil || repl != "" {
 			if repl != "" {
@@ -376,6 +406,24 @@ func WatchDog() {
 		found := false
 		splitPath := strings.Split(dk.Dir, "/")
 		dk.MFSPath = splitPath[len(splitPath)-2]
+
+		// Hash directory if we're using a DB.
+		if DB != nil {
+			hashmap, err := HashDir(dk.Dir)
+			if err != nil {
+				log.Panicln("Error hashing directory for hash DB:", err)
+			}
+			HashLock.Lock()
+			for _, hash := range hashmap {
+				if hash.Update() {
+					AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):])
+				}
+				Hashes[hash.PathOnDisk] = hash
+			}
+			HashLock.Unlock()
+		}
+
+		// Check if we recognize any keys, mark them as found, and load them if so.
 		for _, ik := range keys.Keys {
 			if ik.Name == KeySpace+dk.Key {
 				dk.CID = ResolveIPNS(ik.Id)
@@ -422,6 +470,7 @@ type ConfigFileStruct struct {
 	Dirs     []*DirKey
 	Sync     string
 	Ignore   []string
+	DB       string
 }
 
 func loadConfig(path string) {
@@ -458,6 +507,9 @@ func loadConfig(path string) {
 			SyncTime = tsTime
 		}
 	}
+	if cfg.DB != "" {
+		DBPath = cfg.DB
+	}
 }
 
 func main() {
@@ -490,6 +542,12 @@ func main() {
 		Ignore = IgnoreFlag.Ignores
 	} else if len(Ignore) == 0 {
 		Ignore = []string{"kate-swp", "swp", "part"}
+	}
+	if *DBPathFlag != "" {
+		DBPath = *DBPathFlag
+	}
+	if DBPath != "" {
+		InitDB(DBPath)
 	}
 	if *SyncTimeFlag != time.Second*10 || SyncTime == 0 {
 		SyncTime = *SyncTimeFlag

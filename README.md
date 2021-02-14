@@ -5,6 +5,8 @@ Note: This software is very young. If you discover any bugs, please report them 
 
 `ipfs-sync` is a simple daemon which will watch files on your filesystem, mirror them to MFS, automatically update related pins, and update related IPNS keys, so you can always access your directories from the same address. You can use it to sync your documents, photos, videos, or even a website!
 
+<a href="https://www.buymeacoffee.com/trdiscordian" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+
 ## Installation
 
 You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be added to your `$PATH` to execute the command. Binaries will be released in the near future, removing these requirements.
@@ -13,7 +15,7 @@ You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be add
 
 ## Usage
 
-The only required parameter is `dirs`, which can be specified in the config file, or as an argument.
+The only required parameter is `dirs`, which can be specified in the config file, or as an argument. The `ID` parameter is simply a unique idenifier for you to remember, the IPNS key will be generated using this ID.
 
 ```
 Usage of ipfs-sync:
@@ -22,13 +24,13 @@ Usage of ipfs-sync:
   -config string
         path to config file to use
   -dirs value
-        set the dirs to monitor in json format like: [{"Key":"Example1", "Dir":"/home/user/Documents/"},{"Key":"Example2", "Dir":"/home/user/Pictures/"}]
+        set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/"},{"ID":"Example2", "Dir":"/home/user/Pictures/"}]
   -endpoint string
         node to connect to over HTTP (default "http://127.0.0.1:5001")
   -ignore value
         set the suffixes to ignore (default: ["kate-swp", "swp", "part"])
-  -license
-        display license and exit
+  -copyright
+        display copyright and exit
   -sync duration
         time to sleep between IPNS syncs (ex: 120s) (default 10s)
 ```
@@ -41,11 +43,11 @@ Usage of ipfs-sync:
 Getting started is simple. The only required field is `dirs`, so if we wanted to sync a folder, we'd simply run:
 
 ```
-ipfs-sync -dirs '[{"Key":"ExampleKey", "Dir":"/home/user/Documents/ExampleFolder/"}]'
+ipfs-sync -dirs '[{"ID":"ExampleID", "Dir":"/home/user/Documents/ExampleFolder/"}]'
 2021/02/12 18:03:38 ipfs-sync starting up...
-2021/02/12 18:03:38 ExampleKey not found, generating...
+2021/02/12 18:03:38 ExampleID not found, generating...
 2021/02/12 18:03:38 Adding file to /ipfs-sync/ExampleFolder/index.html ...
 2021/02/12 18:04:40 ExampleKey loaded: k51qzi5uqu5dlpvinw1zhxzo4880ge5hg9tp3ao4ye3aujdru9rap2h7izk5lm
 ```
 
-This command will first check if there's a key named `ExampleKey` in `ipfs-sync`'s namespace, if not, it'll generate and return one. In this example, it synced a simple website to `k51qzi5uqu5dlpvinw1zhxzo4880ge5hg9tp3ao4ye3aujdru9rap2h7izk5lm`. As you add/remove/change files in the directory now, they'll be visible live at that address.
+This command will first check if there's a key named `ExampleID` in `ipfs-sync`'s namespace, if not, it'll generate and return one. In this example, it synced a simple website to `k51qzi5uqu5dlpvinw1zhxzo4880ge5hg9tp3ao4ye3aujdru9rap2h7izk5lm`. As you add/remove/change files in the directory now, they'll be visible live at that address.

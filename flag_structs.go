@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
-	//	"errors"
 )
 
 type DirKey struct {
-	Key string
+	Key string `json:"ID"`
 	Dir string
 
 	// probably best to let this be managed automatically
