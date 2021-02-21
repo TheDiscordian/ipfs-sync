@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"mime/multipart"
@@ -25,24 +26,24 @@ const (
 	API      = "/api/v0/"
 )
 
-// TODO toggle to ignore hidden files
-
 var (
-	BasePathFlag   = flag.String("basepath", "/ipfs-sync/", "relative MFS directory path")
-	BasePath       string
-	EndPointFlag   = flag.String("endpoint", "http://127.0.0.1:5001", "node to connect to over HTTP")
-	EndPoint       string
-	DirKeysFlag    = new(SyncDirs)
-	DirKeys        []*DirKey
-	SyncTimeFlag   = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
-	SyncTime       time.Duration
-	ConfigFileFlag = flag.String("config", "", "path to config file to use")
-	ConfigFile     string
-	IgnoreFlag     = new(IgnoreStruct)
-	Ignore         []string
-	LicenseFlag    = flag.Bool("copyright", false, "display copyright and exit")
-	DBPathFlag     = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync/hashes.db")`)
-	DBPath         string
+	BasePathFlag     = flag.String("basepath", "/ipfs-sync/", "relative MFS directory path")
+	BasePath         string
+	EndPointFlag     = flag.String("endpoint", "http://127.0.0.1:5001", "node to connect to over HTTP")
+	EndPoint         string
+	DirKeysFlag      = new(SyncDirs)
+	DirKeys          []*DirKey
+	SyncTimeFlag     = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
+	SyncTime         time.Duration
+	ConfigFileFlag   = flag.String("config", "", "path to config file to use")
+	ConfigFile       string
+	IgnoreFlag       = new(IgnoreStruct)
+	Ignore           []string
+	LicenseFlag      = flag.Bool("copyright", false, "display copyright and exit")
+	DBPathFlag       = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync/hashes.db")`)
+	DBPath           string
+	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
+	IgnoreHidden     bool
 )
 
 func init() {
@@ -70,9 +71,21 @@ func watchDir(dir string) chan bool {
 		return nil
 	}
 
-	watchThis := func(path string, fi os.FileInfo, err error) error {
+	watchThis := func(path string, fi fs.DirEntry, err error) error {
 		// since fsnotify can watch all the files in a directory, watchers only need to be added to each nested directory
-		if fi.Mode().IsDir() {
+		if fi.IsDir() {
+			filePathSplit := strings.Split(path, "/")
+			if IgnoreHidden {
+				if len(filePathSplit[len(filePathSplit)-1]) > 0 {
+					if filePathSplit[len(filePathSplit)-1][0] == '.' {
+						return fs.SkipDir
+					}
+				} else {
+					if filePathSplit[len(filePathSplit)-2][0] == '.' {
+						return fs.SkipDir
+					}
+				}
+			}
 			return watcher.Add(path)
 		}
 
@@ -80,7 +93,7 @@ func watchDir(dir string) chan bool {
 	}
 
 	// starting at the root of the project, walk each file/directory searching for directories
-	if err := filepath.Walk(dir, watchThis); err != nil {
+	if err := filepath.WalkDir(dir, watchThis); err != nil {
 		log.Println("ERROR", err)
 	}
 
@@ -97,6 +110,18 @@ func watchDir(dir string) chan bool {
 					return
 				}
 				//log.Println("event:", event)
+				filePathSplit := strings.Split(event.Name, "/")
+				if IgnoreHidden {
+					if len(filePathSplit[len(filePathSplit)-1]) > 0 {
+						if filePathSplit[len(filePathSplit)-1][0] == '.' {
+							continue
+						}
+					} else {
+						if filePathSplit[len(filePathSplit)-2][0] == '.' {
+							continue
+						}
+					}
+				}
 				splitName := strings.Split(event.Name, ".")
 				if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
 					continue
@@ -122,11 +147,12 @@ func watchDir(dir string) chan bool {
 							} else {
 								Hashes[event.Name] = new(FileHash).Recalculate(event.Name)
 							}
+							Hashes[event.Name].Update()
 							HashLock.Unlock()
 						}
 						continue
 					}
-					if err := filepath.Walk(event.Name, watchThis); err != nil {
+					if err := filepath.WalkDir(event.Name, watchThis); err != nil {
 						log.Println("ERROR", err)
 					}
 				case fsnotify.Write:
@@ -144,6 +170,7 @@ func watchDir(dir string) chan bool {
 						} else {
 							Hashes[event.Name] = new(FileHash).Recalculate(event.Name)
 						}
+						Hashes[event.Name].Update()
 						HashLock.Unlock()
 					}
 				case fsnotify.Remove, fsnotify.Rename:
@@ -225,9 +252,18 @@ func RemoveFile(fpath string) error {
 
 func filePathWalkDir(root string) ([]string, error) {
 	var files []string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	err := filepath.WalkDir(root, func(path string, info fs.DirEntry, err error) error {
 		if !info.IsDir() {
+			filePathSplit := strings.Split(path, "/")
+			if IgnoreHidden && filePathSplit[len(filePathSplit)-1][0] == '.' {
+				return nil
+			}
 			files = append(files, path)
+		} else {
+			dirPathSplit := strings.Split(path, "/")
+			if IgnoreHidden && len(dirPathSplit[len(dirPathSplit)-1]) > 0 && dirPathSplit[len(dirPathSplit)-1][0] == '.' {
+				return filepath.SkipDir
+			}
 		}
 		return nil
 	})
@@ -243,6 +279,10 @@ func AddDir(path string) (string, error) {
 		return "", err
 	}
 	for _, file := range files {
+		filePathSplit := strings.Split(file, "/")
+		if IgnoreHidden && filePathSplit[len(filePathSplit)-1][0] == '.' {
+			continue
+		}
 		splitName := strings.Split(file, ".")
 		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
 			continue
@@ -465,12 +505,13 @@ func WatchDog() {
 
 // ConfigFileStruct is used for loading information from the config file.
 type ConfigFileStruct struct {
-	BasePath string
-	EndPoint string
-	Dirs     []*DirKey
-	Sync     string
-	Ignore   []string
-	DB       string
+	BasePath     string
+	EndPoint     string
+	Dirs         []*DirKey
+	Sync         string
+	Ignore       []string
+	DB           string
+	IgnoreHidden bool
 }
 
 func loadConfig(path string) {
@@ -510,6 +551,7 @@ func loadConfig(path string) {
 	if cfg.DB != "" {
 		DBPath = cfg.DB
 	}
+	IgnoreHidden = cfg.IgnoreHidden
 }
 
 func main() {
@@ -551,6 +593,9 @@ func main() {
 	}
 	if *SyncTimeFlag != time.Second*10 || SyncTime == 0 {
 		SyncTime = *SyncTimeFlag
+	}
+	if *IgnoreHiddenFlag {
+		IgnoreHidden = true
 	}
 
 	// Start WatchDog.

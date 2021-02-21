@@ -4,5 +4,6 @@
   "Dirs": [],
   "Sync": "10s",
   "Ignore": ["kate-swp", "swp", "part"],
-  "DB": ""
+  "DB": "",
+  "IgnoreHidden": true
 }
