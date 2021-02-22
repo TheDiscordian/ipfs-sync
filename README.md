@@ -13,7 +13,7 @@
 
 If you're on an Arch based distro, `ipfs-sync` is available on the [AUR](https://aur.archlinux.org/packages/ipfs-sync/).
 
-Binaries are availble on the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) page for other distros.
+Binaries are available on the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) page for other distros.
 
 ### Source
 
