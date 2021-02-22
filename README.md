@@ -11,7 +11,7 @@
 
 *Note: These steps are only needed to install from source. If you'd rather a binary, head over to the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) and simply download a release for your OS.*
 
-You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be added to your `$PATH` to execute the command. Binaries will be released in the near future, removing these requirements.
+You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be added to your `$PATH` to execute the command.
 
 `go install github.com/TheDiscordian/ipfs-sync`
 
