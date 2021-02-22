@@ -9,7 +9,13 @@
 
 ## Installation
 
-*Note: These steps are only needed to install from source. If you'd rather a binary, head over to the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) and simply download a release for your OS.*
+### Binary
+
+If you're on an Arch based distro, `ipfs-sync` is available on the [AUR](https://aur.archlinux.org/packages/ipfs-sync/).
+
+Binaries are availble on the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) page for other distros.
+
+### Source
 
 You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be added to your `$PATH` to execute the command.
 
