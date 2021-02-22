@@ -1,0 +1,10 @@
+[Unit]
+Description=ipfs-sync
+
+[Service]
+Type=simple
+StandardOutput=journal
+ExecStart=/bin/bash -c 'ipfs-sync -config $HOME/.ipfs-sync.json'
+
+[Install]
+WantedBy=default.target
