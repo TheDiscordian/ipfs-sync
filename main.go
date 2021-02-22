@@ -24,6 +24,16 @@ import (
 const (
 	KeySpace = "ipfs-sync."
 	API      = "/api/v0/"
+
+	DefaultConfig = `{
+	"BasePath": "/ipfs-sync/",
+	"EndPoint": "http://127.0.0.1:5001",
+	"Dirs": [],
+	"Sync": "10s",
+	"Ignore": ["kate-swp", "swp", "part"],
+	"DB": "",
+	"IgnoreHidden": true
+}`
 )
 
 var (
@@ -515,11 +525,22 @@ type ConfigFileStruct struct {
 }
 
 func loadConfig(path string) {
+	log.Println("Loading config file", path)
 	cfgFile, err := os.Open(path)
 	if err != nil {
-		log.Println("[ERROR] Error loading config file:", err)
-		log.Println("[ERROR] Skipping config file...")
-		return
+		log.Println("Config file not found, generating...")
+		err = ioutil.WriteFile(path, []byte(DefaultConfig), 0644)
+		if err != nil {
+			log.Println("[ERROR] Error loading config file:", err)
+			log.Println("[ERROR] Skipping config file...")
+			return
+		}
+		cfgFile, err = os.Open(path)
+		if err != nil {
+			log.Println("[ERROR] Error loading config file:", err)
+			log.Println("[ERROR] Skipping config file...")
+			return
+		}
 	}
 	defer cfgFile.Close()
 
