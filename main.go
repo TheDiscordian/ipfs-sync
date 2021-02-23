@@ -592,7 +592,7 @@ func main() {
 		DirKeys = DirKeysFlag.DirKeys
 	}
 	if len(DirKeys) == 0 {
-		log.Fatalln("-dirs field is required.")
+		log.Fatalln(`dirs field is required as flag, or in config (ex: {"ID":"UniqueIdentifier", "Dir":"/path/to/dir/to/sync/"}).`)
 	}
 	if *BasePathFlag != "/ipfs-sync/" || BasePath == "" {
 		BasePath = *BasePathFlag
