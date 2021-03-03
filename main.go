@@ -579,7 +579,9 @@ func main() {
 	// Process config and flags.
 	flag.Parse()
 	if *LicenseFlag {
-		log.Println("Copyright © 2020, The ipfs-sync Contributors. All rights reserved.")
+		fmt.Println("Copyright © 2020, The ipfs-sync Contributors. All rights reserved.")
+		fmt.Println("BSD 3-Clause “New” or “Revised” License.")
+		fmt.Println("License available at: https://github.com/TheDiscordian/ipfs-sync/blob/master/LICENSE")
 		return
 	}
 	log.Println("ipfs-sync starting up...")
