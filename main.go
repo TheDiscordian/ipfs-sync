@@ -54,6 +54,9 @@ var (
 	DBPath           string
 	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
 	IgnoreHidden     bool
+	VersionFlag      = flag.Bool("version", false, "display version and exit")
+
+	version string // passed by -ldflags
 )
 
 func init() {
@@ -582,6 +585,10 @@ func main() {
 		fmt.Println("Copyright © 2020, The ipfs-sync Contributors. All rights reserved.")
 		fmt.Println("BSD 3-Clause “New” or “Revised” License.")
 		fmt.Println("License available at: https://github.com/TheDiscordian/ipfs-sync/blob/master/LICENSE")
+		return
+	}
+	if *VersionFlag {
+		fmt.Printf("ipfs-sync %s\n", version)
 		return
 	}
 	log.Println("ipfs-sync starting up...")
