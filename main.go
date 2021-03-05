@@ -86,7 +86,8 @@ func watchDir(dir string) chan bool {
 
 	watchThis := func(path string, fi fs.DirEntry, err error) error {
 		// since fsnotify can watch all the files in a directory, watchers only need to be added to each nested directory
-		if fi.IsDir() {
+		// we must check for nil as a panic is possible if fi is for some reason nil
+		if fi != nil && fi.IsDir() {
 			filePathSplit := strings.Split(path, "/")
 			if IgnoreHidden {
 				if len(filePathSplit[len(filePathSplit)-1]) > 0 {
