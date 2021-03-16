@@ -55,7 +55,7 @@ Usage of ipfs-sync:
 Getting started is simple. The only required field is `dirs`, so if we wanted to sync a folder, we'd simply run:
 
 ```
-ipfs-sync -dirs '[{"ID":"ExampleID", "Dir":"/home/user/Documents/ExampleFolder/"}]'
+ipfs-sync -dirs '[{"ID":"ExampleID", "Dir":"/home/user/Documents/ExampleFolder/", "Nocopy": false}]'
 2021/02/12 18:03:38 ipfs-sync starting up...
 2021/02/12 18:03:38 ExampleID not found, generating...
 2021/02/12 18:03:38 Adding file to /ipfs-sync/ExampleFolder/index.html ...
@@ -63,3 +63,5 @@ ipfs-sync -dirs '[{"ID":"ExampleID", "Dir":"/home/user/Documents/ExampleFolder/"
 ```
 
 This command will first check if there's a key named `ExampleID` in `ipfs-sync`'s namespace, if not, it'll generate and return one. In this example, it synced a simple website to `k51qzi5uqu5dlpvinw1zhxzo4880ge5hg9tp3ao4ye3aujdru9rap2h7izk5lm`. As you add/remove/change files in the directory now, they'll be visible live at that address.
+
+The `Nocopy` option enables the `--nocopy` option when adding files for that shared directory, more info about the option can be found [here](https://docs.ipfs.io/reference/http/api/#api-v0-add), and it requires the [ipfs filestore experimental feature](https://github.com/ipfs/go-ipfs/blob/master/docs/experimental-features.md#ipfs-filestore) enabled.

@@ -5,8 +5,9 @@ import (
 )
 
 type DirKey struct {
-	Key string `json:"ID"`
-	Dir string
+	Key    string `json:"ID"`
+	Dir    string
+	Nocopy bool
 
 	// probably best to let this be managed automatically
 	CID     string

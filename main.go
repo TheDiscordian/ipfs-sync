@@ -12,6 +12,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -73,7 +74,7 @@ func findInStringSlice(slice []string, val string) int {
 	return -1
 }
 
-func watchDir(dir string) chan bool {
+func watchDir(dir string, nocopy bool) chan bool {
 	dirSplit := strings.Split(dir, "/")
 	dirName := dirSplit[len(dirSplit)-2]
 
@@ -147,7 +148,7 @@ func watchDir(dir string) chan bool {
 						log.Println("WATCHER ERROR", err)
 						continue
 					} else if !fi.Mode().IsDir() {
-						repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):])
+						repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy)
 						if err != nil {
 							log.Println("WATCHER ERROR", err)
 						}
@@ -170,7 +171,7 @@ func watchDir(dir string) chan bool {
 						log.Println("ERROR", err)
 					}
 				case fsnotify.Write:
-					repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):])
+					repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy)
 					if err != nil {
 						log.Println("ERROR", err)
 					}
@@ -188,6 +189,7 @@ func watchDir(dir string) chan bool {
 						HashLock.Unlock()
 					}
 				case fsnotify.Remove, fsnotify.Rename:
+					log.Println("Removing", fpath, "...")
 					err := RemoveFile(dirName + "/" + event.Name[len(dir):])
 					if err != nil {
 						log.Println("ERROR", err)
@@ -253,8 +255,19 @@ func GetFileCID(filePath string) string {
 
 // RemoveFile removes a file from the MFS relative to BasePath.
 func RemoveFile(fpath string) error {
-	log.Println("Removing", fpath, "...")
 	repl, err := doRequest(fmt.Sprintf(`files/rm?arg=%s&force=true`, BasePath+url.QueryEscape(fpath)))
+	if err != nil || repl != "" {
+		if repl != "" {
+			err = errors.New(repl)
+		}
+		return err
+	}
+	return err
+}
+
+// MakeDir makes a directory along with parents in path
+func MakeDir(path string) error {
+	repl, err := doRequest(fmt.Sprintf(`files/mkdir?arg=%s&parents=true`, BasePath+url.QueryEscape(path)))
 	if err != nil || repl != "" {
 		if repl != "" {
 			err = errors.New(repl)
@@ -285,7 +298,7 @@ func filePathWalkDir(root string) ([]string, error) {
 }
 
 // AddDir adds a directory, and returns CID.
-func AddDir(path string) (string, error) {
+func AddDir(path string, nocopy bool) (string, error) {
 	pathSplit := strings.Split(path, "/")
 	dirName := pathSplit[len(pathSplit)-2]
 	files, err := filePathWalkDir(path)
@@ -301,7 +314,7 @@ func AddDir(path string) (string, error) {
 		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
 			continue
 		}
-		repl, err := AddFile(file, dirName+"/"+file[len(path):])
+		repl, err := AddFile(file, dirName+"/"+file[len(path):], nocopy)
 		if err != nil || repl != "" {
 			if repl != "" {
 				err = errors.New(repl)
@@ -315,9 +328,8 @@ func AddDir(path string) (string, error) {
 }
 
 // AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added.
-func AddFile(from, to string) (string, error) {
-	to = BasePath + to
-	log.Println("Adding file to", to, "...")
+func AddFile(from, to string, nocopy bool) (string, error) {
+	log.Println("Adding file to", BasePath+to, "...")
 	f, err := os.Open(from)
 	if err != nil {
 		return "", err
@@ -326,27 +338,51 @@ func AddFile(from, to string) (string, error) {
 
 	buff := &bytes.Buffer{}
 	writer := multipart.NewWriter(buff)
-	part, _ := writer.CreateFormFile("file", filepath.Base(f.Name()))
+
+	h := make(textproto.MIMEHeader)
+	h.Set("Abspath", from)
+	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", url.QueryEscape(f.Name())))
+	h.Set("Content-Type", "application/octet-stream")
+	part, _ := writer.CreatePart(h)
 	io.Copy(part, f)
+
 	writer.Close()
 
 	c := &http.Client{}
-	req, err := http.NewRequest("POST", fmt.Sprintf(EndPoint+API+`files/write?arg=%s&create=true&truncate=true&parents=true`, url.QueryEscape(to)), buff)
+	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true`, nocopy), buff)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Add("Content-Type", writer.FormDataContentType())
+
 	resp, err := c.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	dec := json.NewDecoder(resp.Body)
 	if err != nil {
 		return "", err
 	}
 
-	return string(body), err
+	hash := new(HashStruct)
+	err = dec.Decode(&hash)
+
+	toSplit := strings.Split(to, "/")
+	err = MakeDir(strings.Join(toSplit[:len(toSplit)-1], "/"))
+	if err != nil {
+		return "", err
+	}
+	RemoveFile(to)
+
+	repl, err := doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
+	if err != nil || repl != "" {
+		if repl != "" {
+			err = errors.New(repl)
+		}
+		log.Println(err)
+	}
+	return hash.Hash, err
 }
 
 // Pin CID
@@ -470,7 +506,7 @@ func WatchDog() {
 			HashLock.Lock()
 			for _, hash := range hashmap {
 				if hash.Update() {
-					AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):])
+					AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy)
 				}
 				Hashes[hash.PathOnDisk] = hash
 			}
@@ -483,7 +519,7 @@ func WatchDog() {
 				dk.CID = ResolveIPNS(ik.Id)
 				found = true
 				log.Println(dk.Key, "loaded:", ik.Id)
-				watchDir(dk.Dir)
+				watchDir(dk.Dir, dk.Nocopy)
 				break
 			}
 		}
@@ -493,13 +529,13 @@ func WatchDog() {
 		log.Println(dk.Key, "not found, generating...")
 		ik := GenerateKey(dk.Key)
 		var err error
-		dk.CID, err = AddDir(dk.Dir)
+		dk.CID, err = AddDir(dk.Dir, dk.Nocopy)
 		if err != nil {
 			log.Panicln("[ERROR] Failed to add directory:", err)
 		}
 		Publish(dk.CID, dk.Key)
 		log.Println(dk.Key, "loaded:", ik.Id)
-		watchDir(dk.Dir)
+		watchDir(dk.Dir, dk.Nocopy)
 	}
 
 	// Main loop
