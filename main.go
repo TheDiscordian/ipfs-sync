@@ -56,6 +56,8 @@ var (
 	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
 	IgnoreHidden     bool
 	VersionFlag      = flag.Bool("version", false, "display version and exit")
+	VerboseFlag      = flag.Bool("v", false, "display verbose output")
+	Verbose          bool
 
 	version string // passed by -ldflags
 )
@@ -146,7 +148,6 @@ func watchDir(dir string, nocopy bool) chan bool {
 					fi, err := os.Stat(event.Name)
 					if err != nil {
 						log.Println("WATCHER ERROR", err)
-						continue
 					} else if !fi.Mode().IsDir() {
 						repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy)
 						if err != nil {
@@ -165,9 +166,7 @@ func watchDir(dir string, nocopy bool) chan bool {
 							Hashes[event.Name].Update()
 							HashLock.Unlock()
 						}
-						continue
-					}
-					if err := filepath.WalkDir(event.Name, watchThis); err != nil {
+					} else if err := filepath.WalkDir(event.Name, watchThis); err != nil { // FIXME add existing contents of directory, after watcher is established
 						log.Println("ERROR", err)
 					}
 				case fsnotify.Write:
@@ -189,6 +188,8 @@ func watchDir(dir string, nocopy bool) chan bool {
 						HashLock.Unlock()
 					}
 				case fsnotify.Remove, fsnotify.Rename:
+					// FIXME if dir, also remove DB entries
+
 					fpath := dirName + "/" + event.Name[len(dir):]
 					log.Println("Removing", fpath, "...")
 					err := RemoveFile(fpath)
@@ -243,7 +244,7 @@ type HashStruct struct {
 
 // GetFileCID gets a file CID based on MFS path relative to BasePath.
 func GetFileCID(filePath string) string {
-	out, _ := doRequest("files/stat?hash=true&arg=" + BasePath + url.QueryEscape(filePath))
+	out, _ := doRequest("files/stat?hash=true&arg=" + url.QueryEscape(BasePath+filePath))
 
 	fStat := new(HashStruct)
 
@@ -256,7 +257,7 @@ func GetFileCID(filePath string) string {
 
 // RemoveFile removes a file from the MFS relative to BasePath.
 func RemoveFile(fpath string) error {
-	repl, err := doRequest(fmt.Sprintf(`files/rm?arg=%s&force=true`, BasePath+url.QueryEscape(fpath)))
+	repl, err := doRequest(fmt.Sprintf(`files/rm?arg=%s&force=true`, url.QueryEscape(BasePath+fpath)))
 	if err != nil || repl != "" {
 		if repl != "" {
 			err = errors.New(repl)
@@ -268,7 +269,7 @@ func RemoveFile(fpath string) error {
 
 // MakeDir makes a directory along with parents in path
 func MakeDir(path string) error {
-	repl, err := doRequest(fmt.Sprintf(`files/mkdir?arg=%s&parents=true`, BasePath+url.QueryEscape(path)))
+	repl, err := doRequest(fmt.Sprintf(`files/mkdir?arg=%s&parents=true`, url.QueryEscape(BasePath+path)))
 	if err != nil || repl != "" {
 		if repl != "" {
 			err = errors.New(repl)
@@ -345,6 +346,9 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", url.QueryEscape(f.Name())))
 	h.Set("Content-Type", "application/octet-stream")
 	part, _ := writer.CreatePart(h)
+	if Verbose {
+		fmt.Println("Generating file headers...")
+	}
 	io.Copy(part, f)
 
 	writer.Close()
@@ -356,6 +360,9 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 	}
 	req.Header.Add("Content-Type", writer.FormDataContentType())
 
+	if Verbose {
+		fmt.Println("Doing add request...")
+	}
 	resp, err := c.Do(req)
 	if err != nil {
 		return "", err
@@ -370,12 +377,21 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 	err = dec.Decode(&hash)
 
 	toSplit := strings.Split(to, "/")
+	if Verbose {
+		fmt.Println("Creating parent directory...")
+	}
 	err = MakeDir(strings.Join(toSplit[:len(toSplit)-1], "/"))
 	if err != nil {
 		return "", err
 	}
+	if Verbose {
+		fmt.Println("Removing existing file (if any)...")
+	}
 	RemoveFile(to)
 
+	if Verbose {
+		fmt.Println("Adding file to mfs path:", BasePath+to)
+	}
 	repl, err := doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
 	if err != nil || repl != "" {
 		if repl != "" {
@@ -495,11 +511,16 @@ func WatchDog() {
 	keys := ListKeys()
 	for _, dk := range DirKeys {
 		found := false
+
 		splitPath := strings.Split(dk.Dir, "/")
 		dk.MFSPath = splitPath[len(splitPath)-2]
 
 		// Hash directory if we're using a DB.
 		if DB != nil {
+			if Verbose {
+				log.Println("Hashing", dk.Dir, "...")
+			}
+
 			hashmap, err := HashDir(dk.Dir)
 			if err != nil {
 				log.Panicln("Error hashing directory for hash DB:", err)
@@ -507,7 +528,13 @@ func WatchDog() {
 			HashLock.Lock()
 			for _, hash := range hashmap {
 				if hash.Update() {
-					AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy)
+					if Verbose {
+						log.Println("File updated:", hash.PathOnDisk)
+					}
+					_, err := AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy)
+					if err != nil {
+						fmt.Println("Error adding file:", err)
+					}
 				}
 				Hashes[hash.PathOnDisk] = hash
 			}
