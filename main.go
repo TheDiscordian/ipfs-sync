@@ -692,6 +692,7 @@ func main() {
 	if *IgnoreHiddenFlag {
 		IgnoreHidden = true
 	}
+	Verbose = *VerboseFlag
 
 	// Start WatchDog.
 	WatchDog()
