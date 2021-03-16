@@ -36,7 +36,7 @@ Usage of ipfs-sync:
   -db string
         path to file where db should be stored (example: "/home/user/.ipfs-sync/hashes.db")
   -dirs value
-        set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/"},{"ID":"Example2", "Dir":"/home/user/Pictures/"}]
+        set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/", "Nocopy": false},{"ID":"Example2", "Dir":"/home/user/Pictures/", "Nocopy": false}]
   -endpoint string
         node to connect to over HTTP (default "http://127.0.0.1:5001")
   -ignore value
@@ -45,6 +45,8 @@ Usage of ipfs-sync:
         ignore anything prefixed with "."
   -sync duration
         time to sleep between IPNS syncs (ex: 120s) (default 10s)
+  -version
+        display version and exit
 ```
 
 `ipfs-sync` can be setup and used as a service. Simply point it to a config file, and restart it whenever the config is updated. An example config file can be found at `config.json.sample`.

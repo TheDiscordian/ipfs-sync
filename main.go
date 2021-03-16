@@ -189,8 +189,9 @@ func watchDir(dir string, nocopy bool) chan bool {
 						HashLock.Unlock()
 					}
 				case fsnotify.Remove, fsnotify.Rename:
+					fpath := dirName + "/" + event.Name[len(dir):]
 					log.Println("Removing", fpath, "...")
-					err := RemoveFile(dirName + "/" + event.Name[len(dir):])
+					err := RemoveFile(fpath)
 					if err != nil {
 						log.Println("ERROR", err)
 					}
