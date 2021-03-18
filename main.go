@@ -483,7 +483,7 @@ func ResolveIPNS(key string) (string, error) {
 	if len(pathSplit) < 3 {
 		return "", errors.New("Unexpected output in name/resolve: " + path.Path)
 	}
-	return strings.Split(path.Path, "/")[2], nil
+	return pathSplit[2], nil
 }
 
 // Generates an IPNS key in the keyspace based on name.
