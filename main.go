@@ -466,11 +466,10 @@ func ListKeys() *Keys {
 }
 
 // ResolveIPNS takes an IPNS key and returns the CID it resolves to.
-func ResolveIPNS(key string) string {
+func ResolveIPNS(key string) (string, error) {
 	res, err := doRequest("name/resolve?arg=" + key)
 	if err != nil {
-		log.Println("[ERROR]", err)
-		return ""
+		return "", err
 	}
 	type PathStruct struct {
 		Path string
@@ -478,10 +477,13 @@ func ResolveIPNS(key string) string {
 	path := new(PathStruct)
 	err = json.Unmarshal([]byte(res), path)
 	if err != nil {
-		log.Println("[ERROR]", err)
-		return ""
+		return "", err
 	}
-	return strings.Split(path.Path, "/")[2]
+	pathSplit := strings.Split(path.Path, "/")
+	if len(pathSplit) < 3 {
+		return "", errors.New("Unexpected output in name/resolve: " + path.Path)
+	}
+	return strings.Split(path.Path, "/")[2], nil
 }
 
 // Generates an IPNS key in the keyspace based on name.
@@ -544,7 +546,14 @@ func WatchDog() {
 		// Check if we recognize any keys, mark them as found, and load them if so.
 		for _, ik := range keys.Keys {
 			if ik.Name == KeySpace+dk.Key {
-				dk.CID = ResolveIPNS(ik.Id)
+				var err error
+				dk.CID, err = ResolveIPNS(ik.Id)
+				if err != nil {
+					log.Println("Error resolving IPNS:", err)
+					log.Println("Republishing key...")
+					dk.CID = GetFileCID(dk.MFSPath)
+					Publish(dk.CID, dk.Key)
+				}
 				found = true
 				log.Println(dk.Key, "loaded:", ik.Id)
 				watchDir(dk.Dir, dk.Nocopy)
