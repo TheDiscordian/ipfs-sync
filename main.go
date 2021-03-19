@@ -545,17 +545,17 @@ func WatchDog() {
 
 		// Check if we recognize any keys, mark them as found, and load them if so.
 		for _, ik := range keys.Keys {
-			if ik.Name == KeySpace+dk.Key {
+			if ik.Name == KeySpace+dk.ID {
 				var err error
 				dk.CID, err = ResolveIPNS(ik.Id)
 				if err != nil {
 					log.Println("Error resolving IPNS:", err)
 					log.Println("Republishing key...")
 					dk.CID = GetFileCID(dk.MFSPath)
-					Publish(dk.CID, dk.Key)
+					Publish(dk.CID, dk.ID)
 				}
 				found = true
-				log.Println(dk.Key, "loaded:", ik.Id)
+				log.Println(dk.ID, "loaded:", ik.Id)
 				watchDir(dk.Dir, dk.Nocopy)
 				break
 			}
@@ -563,15 +563,15 @@ func WatchDog() {
 		if found {
 			continue
 		}
-		log.Println(dk.Key, "not found, generating...")
-		ik := GenerateKey(dk.Key)
+		log.Println(dk.ID, "not found, generating...")
+		ik := GenerateKey(dk.ID)
 		var err error
 		dk.CID, err = AddDir(dk.Dir, dk.Nocopy)
 		if err != nil {
 			log.Panicln("[ERROR] Failed to add directory:", err)
 		}
-		Publish(dk.CID, dk.Key)
-		log.Println(dk.Key, "loaded:", ik.Id)
+		Publish(dk.CID, dk.ID)
+		log.Println(dk.ID, "loaded:", ik.Id)
 		watchDir(dk.Dir, dk.Nocopy)
 	}
 
@@ -581,7 +581,7 @@ func WatchDog() {
 		for _, dk := range DirKeys {
 			if fCID := GetFileCID(dk.MFSPath); fCID != dk.CID {
 				// log.Printf("[DEBUG] '%s' != '%s'", fCID, dk.CID)
-				Publish(fCID, dk.Key)
+				Publish(fCID, dk.ID)
 				UpdatePin(dk.CID, fCID)
 				dk.CID = fCID
 				log.Println(dk.MFSPath, "updated...")
@@ -652,8 +652,8 @@ func loadConfig(path string) {
 	IgnoreHidden = cfg.IgnoreHidden
 }
 
-func main() {
-	// Process config and flags.
+// Process flags, and load config.
+func ProcessFlags() {
 	flag.Parse()
 	if *LicenseFlag {
 		fmt.Println("Copyright © 2020, The ipfs-sync Contributors. All rights reserved.")
@@ -674,9 +674,23 @@ func main() {
 	if len(DirKeysFlag.DirKeys) > 0 {
 		DirKeys = DirKeysFlag.DirKeys
 	}
+
+	// Process Dir
 	if len(DirKeys) == 0 {
-		log.Fatalln(`dirs field is required as flag, or in config (ex: {"ID":"UniqueIdentifier", "Dir":"/path/to/dir/to/sync/"}).`)
+		log.Fatalln(`dirs field is required as flag, or in config (ex: {"ID":"UniqueIdentifier", "Dir":"/path/to/dir/to/sync/", "Nocopy": false}).`)
+	} else { // Check if Dir entries are at least somewhat valid.
+		for _, dk := range DirKeys {
+			if len(dk.Dir) == 0 {
+				log.Fatalln("Dir entry path cannot be empty. (ID:", dk.ID, ")")
+			}
+
+			// Check if trailing "/" exists, if not, append it.
+			if dk.Dir[len(dk.Dir)-1] != '/' {
+				dk.Dir = dk.Dir + "/"
+			}
+		}
 	}
+
 	if *BasePathFlag != "/ipfs-sync/" || BasePath == "" {
 		BasePath = *BasePathFlag
 	}
@@ -702,6 +716,11 @@ func main() {
 		IgnoreHidden = true
 	}
 	Verbose = *VerboseFlag
+}
+
+func main() {
+	// Process config and flags.
+	ProcessFlags()
 
 	// Start WatchDog.
 	WatchDog()

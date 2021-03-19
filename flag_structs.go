@@ -5,7 +5,7 @@ import (
 )
 
 type DirKey struct {
-	Key    string `json:"ID"`
+	ID     string `json:"ID"`
 	Dir    string
 	Nocopy bool
 
