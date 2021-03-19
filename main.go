@@ -318,9 +318,9 @@ func AddDir(path string, nocopy bool) (string, error) {
 		}
 		repl, err := AddFile(file, dirName+"/"+file[len(path):], nocopy)
 		if err != nil || repl != "" {
-			if repl != "" {
-				err = errors.New(repl)
-			}
+			//if repl != "" { FIXME check if resp is really an error before deciding it is
+			//	err = errors.New(repl)
+			//}
 			return "", err
 		}
 	}
@@ -394,9 +394,9 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 	}
 	repl, err := doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
 	if err != nil || repl != "" {
-		if repl != "" {
-			err = errors.New(repl)
-		}
+		//if repl != "" { FIXME check if response is *actually* an error, before deciding it is.
+		//	err = errors.New(repl)
+		//}
 		log.Println(err)
 	}
 	return hash.Hash, err
