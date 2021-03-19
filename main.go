@@ -347,7 +347,7 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 	h.Set("Content-Type", "application/octet-stream")
 	part, _ := writer.CreatePart(h)
 	if Verbose {
-		fmt.Println("Generating file headers...")
+		log.Println("Generating file headers...")
 	}
 	io.Copy(part, f)
 
@@ -361,7 +361,7 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 	req.Header.Add("Content-Type", writer.FormDataContentType())
 
 	if Verbose {
-		fmt.Println("Doing add request...")
+		log.Println("Doing add request...")
 	}
 	resp, err := c.Do(req)
 	if err != nil {
@@ -378,19 +378,19 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 
 	toSplit := strings.Split(to, "/")
 	if Verbose {
-		fmt.Println("Creating parent directory...")
+		log.Println("Creating parent directory...")
 	}
 	err = MakeDir(strings.Join(toSplit[:len(toSplit)-1], "/"))
 	if err != nil {
 		return "", err
 	}
 	if Verbose {
-		fmt.Println("Removing existing file (if any)...")
+		log.Println("Removing existing file (if any)...")
 	}
 	RemoveFile(to)
 
 	if Verbose {
-		fmt.Println("Adding file to mfs path:", BasePath+to)
+		log.Println("Adding file to mfs path:", BasePath+to)
 	}
 	repl, err := doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
 	if err != nil || repl != "" {
@@ -535,7 +535,7 @@ func WatchDog() {
 					}
 					_, err := AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy)
 					if err != nil {
-						fmt.Println("Error adding file:", err)
+						log.Println("Error adding file:", err)
 					}
 				}
 				Hashes[hash.PathOnDisk] = hash
