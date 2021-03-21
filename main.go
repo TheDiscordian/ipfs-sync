@@ -529,6 +529,9 @@ func WatchDog() {
 			}
 			HashLock.Lock()
 			for _, hash := range hashmap {
+				if Verbose {
+					log.Println("Processing", hash.PathOnDisk, "...")
+				}
 				if hash.Update() {
 					if Verbose {
 						log.Println("File updated:", hash.PathOnDisk)
