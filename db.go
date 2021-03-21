@@ -72,6 +72,9 @@ func HashDir(path string) (map[string]*FileHash, error) {
 	}
 	hashes := make(map[string]*FileHash, len(files))
 	for _, file := range files {
+		if Verbose {
+			log.Println("Hashing", file, "...")
+		}
 		splitName := strings.Split(file, ".")
 		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
 			continue

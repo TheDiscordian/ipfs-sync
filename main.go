@@ -529,9 +529,6 @@ func WatchDog() {
 			}
 			HashLock.Lock()
 			for _, hash := range hashmap {
-				if Verbose {
-					log.Println("Processing", hash.PathOnDisk, "...")
-				}
 				if hash.Update() {
 					if Verbose {
 						log.Println("File updated:", hash.PathOnDisk)
@@ -666,7 +663,7 @@ func ProcessFlags() {
 	}
 	if *VersionFlag {
 		fmt.Printf("ipfs-sync %s\n", version)
-		return
+		os.Exit(0)
 	}
 	log.Println("ipfs-sync starting up...")
 
