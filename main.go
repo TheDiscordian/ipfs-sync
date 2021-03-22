@@ -656,7 +656,7 @@ func ProcessFlags() {
 		fmt.Println("Copyright © 2020, The ipfs-sync Contributors. All rights reserved.")
 		fmt.Println("BSD 3-Clause “New” or “Revised” License.")
 		fmt.Println("License available at: https://github.com/TheDiscordian/ipfs-sync/blob/master/LICENSE")
-		return
+		os.Exit(0)
 	}
 	if *VersionFlag {
 		if version == "" {
