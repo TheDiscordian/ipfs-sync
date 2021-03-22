@@ -188,8 +188,6 @@ func watchDir(dir string, nocopy bool) chan bool {
 						HashLock.Unlock()
 					}
 				case fsnotify.Remove, fsnotify.Rename:
-					// FIXME if dir, also remove DB entries
-
 					fpath := dirName + "/" + event.Name[len(dir):]
 					log.Println("Removing", fpath, "...")
 					err := RemoveFile(fpath)
@@ -199,7 +197,6 @@ func watchDir(dir string, nocopy bool) chan bool {
 					if Hashes != nil {
 						HashLock.Lock()
 						Hashes[event.Name].Delete()
-						delete(Hashes, event.Name)
 						HashLock.Unlock()
 					}
 				}

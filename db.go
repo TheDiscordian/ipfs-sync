@@ -10,6 +10,7 @@ import (
 
 	"github.com/cespare/xxhash"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
 	"sync"
 )
 
@@ -38,12 +39,21 @@ func (fh *FileHash) Update() bool {
 	return false
 }
 
-// Delete removes the PathOnFisk:Hash from the db.
+// Delete removes the PathOnFisk:Hash from the db, works with directories.
 func (fh *FileHash) Delete() {
 	if DB == nil || fh == nil {
 		return
 	}
-	DB.Delete([]byte(fh.PathOnDisk), nil)
+	iter := DB.NewIterator(util.BytesPrefix([]byte(fh.PathOnDisk)), nil)
+	for iter.Next() {
+		path := iter.Key()
+		if Verbose {
+			log.Println("Deleting", string(path), "from DB ...")
+		}
+		DB.Delete(path, nil)
+		delete(Hashes, string(path))
+	}
+	iter.Release()
 }
 
 // Recalculate simply recalculates the Hash, updating Hash and PathOnDisk, and returning a copy of the pointer.
