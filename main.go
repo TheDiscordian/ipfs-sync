@@ -659,6 +659,9 @@ func ProcessFlags() {
 		return
 	}
 	if *VersionFlag {
+		if version == "" {
+			version = "devel"
+		}
 		fmt.Printf("ipfs-sync %s\n", version)
 		os.Exit(0)
 	}
