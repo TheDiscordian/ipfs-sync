@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"io"
 	"log"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/cespare/xxhash"
 	"github.com/syndtr/goleveldb/leveldb"
 	"sync"
 )
@@ -53,7 +53,7 @@ func (fh *FileHash) Recalculate(PathOnDisk string) *FileHash {
 	if err != nil {
 		return nil
 	}
-	hash := sha256.New224()
+	hash := xxhash.New()
 	if _, err := io.Copy(hash, f); err != nil {
 		f.Close()
 		return nil
@@ -83,7 +83,7 @@ func HashDir(path string) (map[string]*FileHash, error) {
 		if err != nil {
 			return nil, err
 		}
-		hash := sha256.New224()
+		hash := xxhash.New()
 		if _, err := io.Copy(hash, f); err != nil {
 			f.Close()
 			return nil, err
