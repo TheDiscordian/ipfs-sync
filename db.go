@@ -39,12 +39,15 @@ func (fh *FileHash) Update() bool {
 	return false
 }
 
-// Delete removes the PathOnFisk:Hash from the db, works with directories.
-func (fh *FileHash) Delete() {
-	if DB == nil || fh == nil {
+// Delete removes the PathOnFisk:Hash from the db, works with directories. path is used in case fh is nil (directory)
+func (fh *FileHash) Delete(path string) {
+	if DB == nil {
 		return
 	}
-	iter := DB.NewIterator(util.BytesPrefix([]byte(fh.PathOnDisk)), nil)
+	if fh != nil {
+		path = fh.PathOnDisk
+	}
+	iter := DB.NewIterator(util.BytesPrefix([]byte(path)), nil)
 	for iter.Next() {
 		path := iter.Key()
 		if Verbose {

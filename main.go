@@ -166,7 +166,9 @@ func watchDir(dir string, nocopy bool) chan bool {
 							Hashes[event.Name].Update()
 							HashLock.Unlock()
 						}
-					} else if err := filepath.WalkDir(event.Name, watchThis); err != nil { // FIXME add existing contents of directory, after watcher is established
+					} else if err := filepath.WalkDir(event.Name, watchThis); err == nil { // FIXME add existing contents of directory, after watcher is established
+						//AddDir(event.Name+"/", nocopy, false)
+					} else {
 						log.Println("ERROR", err)
 					}
 				case fsnotify.Write:
@@ -188,15 +190,20 @@ func watchDir(dir string, nocopy bool) chan bool {
 						HashLock.Unlock()
 					}
 				case fsnotify.Remove, fsnotify.Rename:
+					// check if file is *actually* gone
+					_, err := os.Stat(event.Name)
+					if err == nil {
+						continue
+					}
 					fpath := dirName + "/" + event.Name[len(dir):]
 					log.Println("Removing", fpath, "...")
-					err := RemoveFile(fpath)
+					err = RemoveFile(fpath)
 					if err != nil {
 						log.Println("ERROR", err)
 					}
 					if Hashes != nil {
 						HashLock.Lock()
-						Hashes[event.Name].Delete()
+						Hashes[event.Name].Delete(event.Name)
 						HashLock.Unlock()
 					}
 				}
