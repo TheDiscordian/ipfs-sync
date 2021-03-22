@@ -691,9 +691,15 @@ func ProcessFlags() {
 	if *BasePathFlag != "/ipfs-sync/" || BasePath == "" {
 		BasePath = *BasePathFlag
 	}
+
 	if *EndPointFlag != "http://127.0.0.1:5001" || EndPoint == "" {
 		EndPoint = *EndPointFlag
 	}
+	_, err := doRequest("version")
+	if err != nil {
+		log.Fatalln("Failed to connect to end point:", err)
+	}
+
 	// Ignore has no defaults so we need to set them here (if nothing else set it)
 	if len(IgnoreFlag.Ignores) > 0 {
 		Ignore = IgnoreFlag.Ignores
