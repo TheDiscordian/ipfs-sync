@@ -111,6 +111,54 @@ func watchDir(dir string, nocopy bool) chan bool {
 		return nil
 	}
 
+	addFile := func(fname string) {
+		splitName := strings.Split(fname, "/")
+		parentDir := strings.Join(splitName[:len(splitName)-1], "/")
+		makeDir := !localDirs[parentDir]
+		if makeDir {
+			localDirs[parentDir] = true
+		}
+		repl, err := AddFile(fname, dirName+"/"+fname[len(dir):], nocopy, makeDir)
+		if err != nil {
+			log.Println("WATCHER ERROR", err)
+		}
+		if repl != "" {
+			log.Println(repl)
+		}
+		if Hashes != nil {
+			HashLock.Lock()
+			if Hashes[fname] != nil {
+				Hashes[fname].Recalculate(fname)
+			} else {
+				Hashes[fname] = new(FileHash).Recalculate(fname)
+			}
+			Hashes[fname].Update()
+			HashLock.Unlock()
+		}
+	}
+
+	addDir := func(path string, fi fs.DirEntry, err error) error {
+		if fi != nil && fi.IsDir() {
+			filePathSplit := strings.Split(path, "/")
+			if IgnoreHidden {
+				if len(filePathSplit[len(filePathSplit)-1]) > 0 {
+					if filePathSplit[len(filePathSplit)-1][0] == '.' {
+						return fs.SkipDir
+					}
+				} else {
+					if filePathSplit[len(filePathSplit)-2][0] == '.' {
+						return fs.SkipDir
+					}
+				}
+			}
+			return nil
+		} else {
+			addFile(path)
+		}
+
+		return nil
+	}
+
 	// starting at the root of the project, walk each file/directory searching for directories
 	if err := filepath.WalkDir(dir, watchThis); err != nil {
 		log.Println("ERROR", err)
@@ -128,7 +176,12 @@ func watchDir(dir string, nocopy bool) chan bool {
 					log.Println("NOT OK")
 					return
 				}
-				//log.Println("event:", event)
+				if Verbose {
+					log.Println("fsnotify event:", event)
+				}
+				if len(event.Name) == 0 {
+					continue
+				}
 				filePathSplit := strings.Split(event.Name, "/")
 				if IgnoreHidden {
 					if len(filePathSplit[len(filePathSplit)-1]) > 0 {
@@ -151,64 +204,22 @@ func watchDir(dir string, nocopy bool) chan bool {
 					if err != nil {
 						log.Println("WATCHER ERROR", err)
 					} else if !fi.Mode().IsDir() {
-						splitName := strings.Split(event.Name, "/")
-						parentDir := strings.Join(splitName[:len(splitName)-1], "/")
-						makeDir := !localDirs[parentDir]
-						if makeDir {
-							localDirs[parentDir] = true
-						}
-						repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy, makeDir)
-						if err != nil {
-							log.Println("WATCHER ERROR", err)
-						}
-						if repl != "" {
-							log.Println(repl)
-						}
-						if Hashes != nil {
-							HashLock.Lock()
-							if Hashes[event.Name] != nil {
-								Hashes[event.Name].Recalculate(event.Name)
-							} else {
-								Hashes[event.Name] = new(FileHash).Recalculate(event.Name)
-							}
-							Hashes[event.Name].Update()
-							HashLock.Unlock()
-						}
-					} else if err := filepath.WalkDir(event.Name, watchThis); err == nil { // FIXME add existing contents of directory, after watcher is established
-						//AddDir(event.Name+"/", nocopy, false)
+						addFile(event.Name)
+					} else if err := filepath.WalkDir(event.Name, watchThis); err == nil {
+						filepath.WalkDir(event.Name, addDir)
 					} else {
 						log.Println("ERROR", err)
 					}
 				case fsnotify.Write:
-					splitName := strings.Split(event.Name, "/")
-					parentDir := strings.Join(splitName[:len(splitName)-1], "/")
-					makeDir := !localDirs[parentDir]
-					if makeDir {
-						localDirs[parentDir] = true
-					}
-					repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy, makeDir)
-					if err != nil {
-						log.Println("ERROR", err)
-					}
-					if repl != "" {
-						log.Println(repl)
-					}
-					if Hashes != nil {
-						HashLock.Lock()
-						if Hashes[event.Name] != nil {
-							Hashes[event.Name].Recalculate(event.Name)
-						} else {
-							Hashes[event.Name] = new(FileHash).Recalculate(event.Name)
-						}
-						Hashes[event.Name].Update()
-						HashLock.Unlock()
-					}
+					addFile(event.Name)
 				case fsnotify.Remove, fsnotify.Rename:
 					// check if file is *actually* gone
 					_, err := os.Stat(event.Name)
 					if err == nil {
 						continue
 					}
+					// remove watcher, just in case it's a directory
+					watcher.Remove(event.Name)
 					if localDirs[event.Name] {
 						delete(localDirs, event.Name)
 					}
