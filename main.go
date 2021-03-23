@@ -80,6 +80,8 @@ func watchDir(dir string, nocopy bool) chan bool {
 	dirSplit := strings.Split(dir, "/")
 	dirName := dirSplit[len(dirSplit)-2]
 
+	localDirs := make(map[string]bool)
+
 	// creates a new file watcher
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -149,7 +151,13 @@ func watchDir(dir string, nocopy bool) chan bool {
 					if err != nil {
 						log.Println("WATCHER ERROR", err)
 					} else if !fi.Mode().IsDir() {
-						repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy)
+						splitName := strings.Split(event.Name, "/")
+						parentDir := strings.Join(splitName[:len(splitName)-1], "/")
+						makeDir := !localDirs[parentDir]
+						if makeDir {
+							localDirs[parentDir] = true
+						}
+						repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy, makeDir)
 						if err != nil {
 							log.Println("WATCHER ERROR", err)
 						}
@@ -172,7 +180,13 @@ func watchDir(dir string, nocopy bool) chan bool {
 						log.Println("ERROR", err)
 					}
 				case fsnotify.Write:
-					repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy)
+					splitName := strings.Split(event.Name, "/")
+					parentDir := strings.Join(splitName[:len(splitName)-1], "/")
+					makeDir := !localDirs[parentDir]
+					if makeDir {
+						localDirs[parentDir] = true
+					}
+					repl, err := AddFile(event.Name, dirName+"/"+event.Name[len(dir):], nocopy, makeDir)
 					if err != nil {
 						log.Println("ERROR", err)
 					}
@@ -194,6 +208,9 @@ func watchDir(dir string, nocopy bool) chan bool {
 					_, err := os.Stat(event.Name)
 					if err == nil {
 						continue
+					}
+					if localDirs[event.Name] {
+						delete(localDirs, event.Name)
 					}
 					fpath := dirName + "/" + event.Name[len(dir):]
 					log.Println("Removing", fpath, "...")
@@ -311,6 +328,7 @@ func AddDir(path string, nocopy bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	localDirs := make(map[string]bool)
 	for _, file := range files {
 		filePathSplit := strings.Split(file, "/")
 		if IgnoreHidden && filePathSplit[len(filePathSplit)-1][0] == '.' {
@@ -320,7 +338,12 @@ func AddDir(path string, nocopy bool) (string, error) {
 		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
 			continue
 		}
-		repl, err := AddFile(file, dirName+"/"+file[len(path):], nocopy)
+		parentDir := strings.Join(filePathSplit[:len(filePathSplit)-1], "/")
+		makeDir := !localDirs[parentDir]
+		if makeDir {
+			localDirs[parentDir] = true
+		}
+		repl, err := AddFile(file, dirName+"/"+file[len(path):], nocopy, makeDir)
 		if err != nil || repl != "" {
 			//if repl != "" { FIXME check if resp is really an error before deciding it is
 			//	err = errors.New(repl)
@@ -333,8 +356,8 @@ func AddDir(path string, nocopy bool) (string, error) {
 	return cid, err
 }
 
-// AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added.
-func AddFile(from, to string, nocopy bool) (string, error) {
+// AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added. If makedir is true, it'll create the directory it'll be placed in.
+func AddFile(from, to string, nocopy bool, makedir bool) (string, error) {
 	log.Println("Adding file to", BasePath+to, "...")
 	f, err := os.Open(from)
 	if err != nil {
@@ -380,14 +403,17 @@ func AddFile(from, to string, nocopy bool) (string, error) {
 	hash := new(HashStruct)
 	err = dec.Decode(&hash)
 
-	toSplit := strings.Split(to, "/")
-	if Verbose {
-		log.Println("Creating parent directory...")
+	if makedir {
+		toSplit := strings.Split(to, "/")
+		if Verbose {
+			log.Println("Creating parent directory...")
+		}
+		err = MakeDir(strings.Join(toSplit[:len(toSplit)-1], "/"))
+		if err != nil {
+			return "", err
+		}
 	}
-	err = MakeDir(strings.Join(toSplit[:len(toSplit)-1], "/"))
-	if err != nil {
-		return "", err
-	}
+
 	if Verbose {
 		log.Println("Removing existing file (if any)...")
 	}
@@ -531,13 +557,23 @@ func WatchDog() {
 			if err != nil {
 				log.Panicln("Error hashing directory for hash DB:", err)
 			}
+			localDirs := make(map[string]bool)
 			HashLock.Lock()
 			for _, hash := range hashmap {
 				if hash.Update() {
 					if Verbose {
 						log.Println("File updated:", hash.PathOnDisk)
 					}
-					_, err := AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy)
+
+					// grab parent dir, check if we've already created it
+					splitName := strings.Split(hash.PathOnDisk, "/")
+					parentDir := strings.Join(splitName[:len(splitName)-1], "/")
+					makeDir := !localDirs[parentDir]
+					if makeDir {
+						localDirs[parentDir] = true
+					}
+
+					_, err := AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy, makeDir)
 					if err != nil {
 						log.Println("Error adding file:", err)
 					}
