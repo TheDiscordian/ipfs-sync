@@ -111,14 +111,14 @@ func watchDir(dir string, nocopy bool) chan bool {
 		return nil
 	}
 
-	addFile := func(fname string) {
+	addFile := func(fname string, overwrite bool) {
 		splitName := strings.Split(fname, "/")
 		parentDir := strings.Join(splitName[:len(splitName)-1], "/")
 		makeDir := !localDirs[parentDir]
 		if makeDir {
 			localDirs[parentDir] = true
 		}
-		repl, err := AddFile(fname, dirName+"/"+fname[len(dir):], nocopy, makeDir)
+		repl, err := AddFile(fname, dirName+"/"+fname[len(dir):], nocopy, makeDir, overwrite)
 		if err != nil {
 			log.Println("WATCHER ERROR", err)
 		}
@@ -153,7 +153,7 @@ func watchDir(dir string, nocopy bool) chan bool {
 			}
 			return nil
 		} else {
-			addFile(path)
+			addFile(path, false)
 		}
 
 		return nil
@@ -204,14 +204,14 @@ func watchDir(dir string, nocopy bool) chan bool {
 					if err != nil {
 						log.Println("WATCHER ERROR", err)
 					} else if !fi.Mode().IsDir() {
-						addFile(event.Name)
+						addFile(event.Name, true)
 					} else if err := filepath.WalkDir(event.Name, watchThis); err == nil {
 						filepath.WalkDir(event.Name, addDir)
 					} else {
 						log.Println("ERROR", err)
 					}
 				case fsnotify.Write:
-					addFile(event.Name)
+					addFile(event.Name, true)
 				case fsnotify.Remove, fsnotify.Rename:
 					// check if file is *actually* gone
 					_, err := os.Stat(event.Name)
@@ -354,7 +354,7 @@ func AddDir(path string, nocopy bool) (string, error) {
 		if makeDir {
 			localDirs[parentDir] = true
 		}
-		repl, err := AddFile(file, dirName+"/"+file[len(path):], nocopy, makeDir)
+		repl, err := AddFile(file, dirName+"/"+file[len(path):], nocopy, makeDir, false)
 		if err != nil || repl != "" {
 			//if repl != "" { FIXME check if resp is really an error before deciding it is
 			//	err = errors.New(repl)
@@ -367,8 +367,10 @@ func AddDir(path string, nocopy bool) (string, error) {
 	return cid, err
 }
 
-// AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added. If makedir is true, it'll create the directory it'll be placed in.
-func AddFile(from, to string, nocopy bool, makedir bool) (string, error) {
+// AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added.
+// If makedir is true, it'll create the directory it'll be placed in.
+// If overwrite is true, it'll perform an rm before copying to MFS.
+func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string, error) {
 	log.Println("Adding file to", BasePath+to, "...")
 	f, err := os.Open(from)
 	if err != nil {
@@ -425,10 +427,12 @@ func AddFile(from, to string, nocopy bool, makedir bool) (string, error) {
 		}
 	}
 
-	if Verbose {
-		log.Println("Removing existing file (if any)...")
+	if overwrite {
+		if Verbose {
+			log.Println("Removing existing file (if any)...")
+		}
+		RemoveFile(to)
 	}
-	RemoveFile(to)
 
 	if Verbose {
 		log.Println("Adding file to mfs path:", BasePath+to)
@@ -584,7 +588,7 @@ func WatchDog() {
 						localDirs[parentDir] = true
 					}
 
-					_, err := AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy, makeDir)
+					_, err := AddFile(hash.PathOnDisk, dk.MFSPath+"/"+hash.PathOnDisk[len(dk.Dir):], dk.Nocopy, makeDir, false)
 					if err != nil {
 						log.Println("Error adding file:", err)
 					}
