@@ -25,7 +25,9 @@ You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be add
 
 The only required parameter is `dirs`, which can be specified in the config file, or as an argument. The `ID` parameter is simply a unique idenifier for you to remember, the IPNS key will be generated using this ID.
 
-```
+It's recommended you either use the included systemd user-service, or run `ipfs-sync` with a command like `ipfs-sync -config $HOME/.ipfs-sync.json -db $HOME/.ipfs-sync.db`, after placing a config file in `~/.ipfs-sync.json`.
+
+```bash
 Usage of ipfs-sync:
   -basepath string
         relative MFS directory path (default "/ipfs-sync/")
