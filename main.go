@@ -630,7 +630,7 @@ func WatchDog() {
 	for {
 		time.Sleep(SyncTime)
 		for _, dk := range DirKeys {
-			if fCID := GetFileCID(dk.MFSPath); fCID != dk.CID {
+			if fCID := GetFileCID(dk.MFSPath); len(fCID) > 0 && fCID != dk.CID {
 				// log.Printf("[DEBUG] '%s' != '%s'", fCID, dk.CID)
 				Publish(fCID, dk.ID)
 				UpdatePin(dk.CID, fCID)
