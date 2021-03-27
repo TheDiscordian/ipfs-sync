@@ -123,7 +123,9 @@ func watchDir(dir string, nocopy bool) chan bool {
 			log.Println("WATCHER ERROR", err)
 		}
 		if repl != "" {
-			log.Println(repl)
+			if Verbose {
+				log.Println("AddFile reply:", repl)
+			}
 		}
 		if Hashes != nil {
 			HashLock.Lock()
@@ -264,6 +266,14 @@ func doRequest(cmd string) (string, error) {
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
+	}
+
+	errStruct := new(ErrorStruct)
+	err = json.Unmarshal(body, errStruct)
+	if err == nil {
+		if errStruct.Error() != "" {
+			return string(body), errStruct
+		}
 	}
 
 	return string(body), nil
@@ -416,6 +426,10 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 	hash := new(HashStruct)
 	err = dec.Decode(&hash)
 
+	if Verbose {
+		log.Println("File hash:", hash.Hash)
+	}
+
 	if makedir {
 		toSplit := strings.Split(to, "/")
 		if Verbose {
@@ -434,47 +448,141 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 		RemoveFile(to)
 	}
 
+	// send files/cp request
 	if Verbose {
 		log.Println("Adding file to mfs path:", BasePath+to)
 	}
-	repl, err := doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
-	if err != nil || repl != "" {
-		//if repl != "" { FIXME check if response is *actually* an error, before deciding it is.
-		//	err = errors.New(repl)
-		//}
-		log.Println(err)
+	_, err = doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
+	if err != nil {
+		if Verbose {
+			log.Println("Error on files/cp:", err)
+			log.Println("fpath:", from)
+			if HandleBadBlockError(err) {
+				log.Println("files/cp failure due to bad filestore, trying again...")
+				_, err = doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
+			}
+		}
 	}
 	return hash.Hash, err
 }
 
+type FileStoreStatus int
+
+const NoFile FileStoreStatus = 11
+
+type FileStoreKey struct {
+	Slash string `json:"/"`
+}
+
+// FileStoreEntry is for results returned by `filestore/verify`, only processes Status and Key, as that's all ipfs-sync uses.
+type FileStoreEntry struct {
+	Status FileStoreStatus
+	Key    FileStoreKey
+}
+
+// CleanFilestore removes blocks that point to files that don't exist
+func CleanFilestore() {
+	if Verbose {
+		log.Println("Removing blocks that point to a file that doesn't exist from filestore...")
+	}
+
+	// Build our own request because we want to stream data...
+	c := &http.Client{}
+	req, err := http.NewRequest("POST", EndPoint+API+"filestore/verify", nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// Send request
+	resp, err := c.Do(req)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// Decode the json stream and process it
+	for dec.More() {
+		fsEntry := new(FileStoreEntry)
+		err := dec.Decode(fsEntry)
+		if err != nil {
+			log.Println("Error decoding fsEntry stream:", err)
+			continue
+		}
+		if fsEntry.Status == NoFile { // if the block points to a file that doesn't exist, remove it.
+			_, err := doRequest("block/rm?arg=" + fsEntry.Key.Slash)
+			if Verbose {
+				log.Println("Removing reference from filestore:", fsEntry.Key.Slash)
+			}
+			if err != nil {
+				log.Println("Error removing bad block:", err)
+			}
+		}
+	}
+}
+
+// HandleBackBlockError runs CleanFilestore() and returns true if there was a bad block error.
+func HandleBadBlockError(err error) bool {
+	txt := err.Error()
+	if strings.HasPrefix(txt, "failed to get block") || strings.HasSuffix(txt, "no such file or directory") {
+		CleanFilestore()
+		return true
+	}
+	return false
+}
+
 // Pin CID
 func Pin(cid string) error {
-	_, err := doRequest("pin/add?arg=" + url.QueryEscape(cid))
+	resp, err := doRequest("pin/add?arg=" + url.QueryEscape(cid))
+	if resp != "" {
+		if Verbose {
+			log.Println("Pin response:", resp)
+		}
+	}
 	return err
 }
 
 // ErrorStruct allows us to read the errors received by the IPFS daemon.
 type ErrorStruct struct {
-	Message string
+	Message string // used for error text
+	Error2  string `json:"Error"` // also used for error text
 	Code    int
 	Type    string
 }
 
+// Outputs the error text contained in the struct, statistfies error interface.
+func (es *ErrorStruct) Error() string {
+	switch {
+	case es.Message != "":
+		return es.Message
+	case es.Error2 != "":
+		return es.Error2
+	}
+	return ""
+}
+
 // UpdatePin updates a recursive pin to a new CID, unpinning old content.
 func UpdatePin(from, to string) {
-	resp, err := doRequest("pin/update?arg=" + url.QueryEscape(from) + "&arg=" + url.QueryEscape(to))
+	_, err := doRequest("pin/update?arg=" + url.QueryEscape(from) + "&arg=" + url.QueryEscape(to))
 	if err != nil {
-		log.Println("[ERROR]", err)
-		return
-	}
-	resperr := new(ErrorStruct)
-	err = json.Unmarshal([]byte(resp), resperr)
-	if err != nil {
-		log.Println("[ERROR]", err)
-		return
-	}
-	if resperr.Type == "error" {
-		log.Println("Error updating pin:", resperr.Message)
+		log.Println("Error updating pin:", err)
+		if Verbose {
+			log.Println("From CID:", from, "To CID:", to)
+		}
+		if HandleBadBlockError(err) {
+			if Verbose {
+				log.Println("Bad blocks found, running pin/update again (recursive)")
+			}
+			UpdatePin(from, to)
+			return
+		}
 		err = Pin(to)
 		if err != nil {
 			log.Println("[ERROR] Error adding pin:", err)
@@ -783,9 +891,14 @@ func ProcessFlags() {
 }
 
 func main() {
+	log.Println("Starting up ipfs-sync", version, "...")
 	// Process config and flags.
 	ProcessFlags()
 
+	// Cleanup filestore first.
+	CleanFilestore()
+
 	// Start WatchDog.
+	log.Println("Starting watchdog...")
 	WatchDog()
 }
