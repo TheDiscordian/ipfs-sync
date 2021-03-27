@@ -458,8 +458,7 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 			log.Println("Error on files/cp:", err)
 			log.Println("fpath:", from)
 			if HandleBadBlockError(err) {
-				log.Println("files/cp failure due to bad filestore, trying again...")
-				_, err = doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
+				log.Println("files/cp failure due to bad filestore, file not added")
 			}
 		}
 	}
