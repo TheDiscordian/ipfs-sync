@@ -51,7 +51,7 @@ var (
 	IgnoreFlag       = new(IgnoreStruct)
 	Ignore           []string
 	LicenseFlag      = flag.Bool("copyright", false, "display copyright and exit")
-	DBPathFlag       = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync/hashes.db")`)
+	DBPathFlag       = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync.db")`)
 	DBPath           string
 	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
 	IgnoreHidden     bool
@@ -649,7 +649,6 @@ func GenerateKey(name string) Key {
 // Publish CID to IPNS
 func Publish(cid, key string) error {
 	_, err := doRequest(fmt.Sprintf("name/publish?arg=%s&key=%s", url.QueryEscape(cid), KeySpace+key))
-	// log.Println("[DEBUG] Publish:", res)
 	return err
 }
 

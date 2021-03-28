@@ -25,7 +25,7 @@ You need `go` installed, with a working `GOPATH` and `$GOPATH/bin` should be add
 
 The only required parameter is `dirs`, which can be specified in the config file, or as an argument. The `ID` parameter is simply a unique idenifier for you to remember, the IPNS key will be generated using this ID.
 
-It's recommended you either use the included systemd user-service, or run `ipfs-sync` with a command like `ipfs-sync -config $HOME/.ipfs-sync.json -db $HOME/.ipfs-sync.db`, after placing a config file in `~/.ipfs-sync.json`.
+It's recommended you either use the included systemd user-service, or run `ipfs-sync` with a command like `ipfs-sync -config $HOME/.ipfs-sync.yaml -db $HOME/.ipfs-sync.db`, after placing a config file in `~/.ipfs-sync.yaml`.
 
 ```bash
 Usage of ipfs-sync:
@@ -36,7 +36,7 @@ Usage of ipfs-sync:
   -copyright
         display copyright and exit
   -db string
-        path to file where db should be stored (example: "/home/user/.ipfs-sync/hashes.db")
+        path to file where db should be stored (example: "/home/user/.ipfs-sync.db")
   -dirs value
         set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/", "Nocopy": false},{"ID":"Example2", "Dir":"/home/user/Pictures/", "Nocopy": false}]
   -endpoint string
@@ -52,7 +52,7 @@ Usage of ipfs-sync:
         display version and exit
 ```
 
-`ipfs-sync` can be setup and used as a service. Simply point it to a config file, and restart it whenever the config is updated. An example config file can be found at `config.json.sample`.
+`ipfs-sync` can be setup and used as a service. Simply point it to a config file, and restart it whenever the config is updated. An example config file can be found at `config.yaml.sample`.
 
 
 ## Example

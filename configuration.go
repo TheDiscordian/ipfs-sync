@@ -8,14 +8,16 @@ import (
 	"log"
 	"os"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 // DirKey used for keeping track of directories, and it's used in the `dirs` config paramerter.
 type DirKey struct {
 	// config values
-	ID     string `json:"ID"`
-	Dir    string
-	Nocopy bool
+	ID     string `json:"ID" yaml:"ID"`
+	Dir    string `yaml:"Dir"`
+	Nocopy bool   `yaml:"Nocopy"`
 
 	// probably best to let this be managed automatically
 	CID     string
@@ -60,13 +62,13 @@ func (ig *IgnoreStruct) String() string {
 
 // ConfigFileStruct is used for loading information from the config file.
 type ConfigFileStruct struct {
-	BasePath     string
-	EndPoint     string
-	Dirs         []*DirKey
-	Sync         string
-	Ignore       []string
-	DB           string
-	IgnoreHidden bool
+	BasePath     string    `yaml:"BasePath"`
+	EndPoint     string    `yaml:"EndPoint"`
+	Dirs         []*DirKey `yaml:"Dirs"`
+	Sync         string    `yaml:"Sync"`
+	Ignore       []string  `yaml:"Ignore"`
+	DB           string    `yaml:"DB"`
+	IgnoreHidden bool      `yaml:"IgnoreHidden"`
 }
 
 func loadConfig(path string) {
@@ -88,15 +90,16 @@ func loadConfig(path string) {
 		}
 	}
 	defer cfgFile.Close()
+	cfgTxt, _ := ioutil.ReadAll(cfgFile)
 
 	cfg := new(ConfigFileStruct)
-	dec := json.NewDecoder(cfgFile)
-	err = dec.Decode(cfg)
+	err = yaml.Unmarshal(cfgTxt, cfg)
 	if err != nil {
 		log.Println("[ERROR] Error decoding config file:", err)
 		log.Println("[ERROR] Skipping config file...")
 		return
 	}
+	fmt.Println(cfg)
 	if cfg.BasePath != "" {
 		BasePath = cfg.BasePath
 	}
