@@ -516,10 +516,16 @@ func CleanFilestore() {
 			continue
 		}
 		if fsEntry.Status == NoFile { // if the block points to a file that doesn't exist, remove it.
-			_, err := doRequest("block/rm?arg=" + fsEntry.Key.Slash)
-			if Verbose {
-				log.Println("Removing reference from filestore:", fsEntry.Key.Slash)
+			log.Println("Removing reference from filestore:", fsEntry.Key.Slash)
+			for _, err := doRequest("block/rm?arg=" + fsEntry.Key.Slash); err != nil && strings.HasPrefix(err.Error(), "pinned"); _, err = doRequest("block/rm?arg=" + fsEntry.Key.Slash) {
+				cid := strings.Split(err.Error(), " ")[2]
+				log.Println("Effected block is pinned, removing pin:", cid)
+				_, err := doRequest("pin/rm?arg=" + cid)
+				if err != nil {
+					log.Println("Error removing pin:", err)
+				}
 			}
+
 			if err != nil {
 				log.Println("Error removing bad block:", err)
 			}
