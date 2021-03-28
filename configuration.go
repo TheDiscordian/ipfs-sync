@@ -178,7 +178,7 @@ func ProcessFlags() {
 	if len(IgnoreFlag.Ignores) > 0 {
 		Ignore = IgnoreFlag.Ignores
 	} else if len(Ignore) == 0 {
-		Ignore = []string{"kate-swp", "swp", "part"}
+		Ignore = []string{"kate-swp", "swp", "part", "crdownload"}
 	}
 	if *DBPathFlag != "" {
 		DBPath = *DBPathFlag

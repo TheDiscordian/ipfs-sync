@@ -42,7 +42,7 @@ Usage of ipfs-sync:
   -endpoint string
         node to connect to over HTTP (default "http://127.0.0.1:5001")
   -ignore value
-        set the suffixes to ignore (default: ["kate-swp", "swp", "part"])
+        set the suffixes to ignore (default: ["kate-swp", "swp", "part", "crdownload"])
   -ignorehidden
         ignore anything prefixed with "."
   -sync duration

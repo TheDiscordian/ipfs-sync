@@ -64,7 +64,7 @@ var (
 
 func init() {
 	flag.Var(DirKeysFlag, "dirs", `set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/", "Nocopy": false},{"ID":"Example2", "Dir":"/home/user/Pictures/", "Nocopy": false}]`)
-	flag.Var(IgnoreFlag, "ignore", `set the suffixes to ignore (default: ["kate-swp", "swp", "part"])`)
+	flag.Var(IgnoreFlag, "ignore", `set the suffixes to ignore (default: ["kate-swp", "swp", "part", "crdownload"])`)
 }
 
 func findInStringSlice(slice []string, val string) int {
