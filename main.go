@@ -763,8 +763,13 @@ func main() {
 	// Process config and flags.
 	ProcessFlags()
 
-	// Cleanup filestore first.
-	CleanFilestore()
+	for _, dk := range DirKeys {
+		if dk.Nocopy {
+			// Cleanup filestore first.
+			CleanFilestore()
+			break
+		}
+	}
 
 	// Start WatchDog.
 	log.Println("Starting watchdog...")
