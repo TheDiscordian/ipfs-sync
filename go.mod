@@ -1,6 +1,6 @@
 module github.com/TheDiscordian/ipfs-sync
 
-go 1.15
+go 1.16
 
 require (
 	github.com/cespare/xxhash v1.1.0

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +12,9 @@ import (
 
 	"gopkg.in/yaml.v2"
 )
+
+//go:embed config.yaml.sample
+var content embed.FS
 
 // DirKey used for keeping track of directories, and it's used in the `dirs` config paramerter.
 type DirKey struct {
@@ -76,7 +80,8 @@ func loadConfig(path string) {
 	cfgFile, err := os.Open(path)
 	if err != nil {
 		log.Println("Config file not found, generating...")
-		err = ioutil.WriteFile(path, []byte(DefaultConfig), 0644)
+		defaultconfig, _ := content.ReadFile("config.yaml.sample")
+		err = ioutil.WriteFile(path, defaultconfig, 0644)
 		if err != nil {
 			log.Println("[ERROR] Error loading config file:", err)
 			log.Println("[ERROR] Skipping config file...")

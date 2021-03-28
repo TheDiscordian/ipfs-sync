@@ -25,16 +25,6 @@ import (
 const (
 	KeySpace = "ipfs-sync."
 	API      = "/api/v0/"
-
-	DefaultConfig = `{
-	"BasePath": "/ipfs-sync/",
-	"EndPoint": "http://127.0.0.1:5001",
-	"Dirs": [],
-	"Sync": "10s",
-	"Ignore": ["kate-swp", "swp", "part"],
-	"DB": "",
-	"IgnoreHidden": true
-}`
 )
 
 var (
@@ -746,9 +736,10 @@ func WatchDog() {
 }
 
 func main() {
-	log.Println("Starting up ipfs-sync", version, "...")
 	// Process config and flags.
 	ProcessFlags()
+
+	log.Println("Starting up ipfs-sync", version, "...")
 
 	for _, dk := range DirKeys {
 		if dk.Nocopy {
