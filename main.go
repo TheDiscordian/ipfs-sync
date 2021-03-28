@@ -299,25 +299,13 @@ func GetFileCID(filePath string) string {
 
 // RemoveFile removes a file from the MFS relative to BasePath.
 func RemoveFile(fpath string) error {
-	repl, err := doRequest(fmt.Sprintf(`files/rm?arg=%s&force=true`, url.QueryEscape(BasePath+fpath)))
-	if err != nil || repl != "" {
-		if repl != "" {
-			err = errors.New(repl)
-		}
-		return err
-	}
+	_, err := doRequest(fmt.Sprintf(`files/rm?arg=%s&force=true`, url.QueryEscape(BasePath+fpath)))
 	return err
 }
 
 // MakeDir makes a directory along with parents in path
 func MakeDir(path string) error {
-	repl, err := doRequest(fmt.Sprintf(`files/mkdir?arg=%s&parents=true`, url.QueryEscape(BasePath+path)))
-	if err != nil || repl != "" {
-		if repl != "" {
-			err = errors.New(repl)
-		}
-		return err
-	}
+	_, err := doRequest(fmt.Sprintf(`files/mkdir?arg=%s&parents=true`, url.QueryEscape(BasePath+path)))
 	return err
 }
 
