@@ -60,25 +60,43 @@ func (fh *FileHash) Delete(path string) {
 }
 
 // Recalculate simply recalculates the Hash, updating Hash and PathOnDisk, and returning a copy of the pointer.
-func (fh *FileHash) Recalculate(PathOnDisk string) *FileHash {
+func (fh *FileHash) Recalculate(PathOnDisk string, dontHash bool) *FileHash {
 	fh.PathOnDisk = PathOnDisk
-	f, err := os.Open(fh.PathOnDisk)
-	if err != nil {
-		return nil
-	}
-	hash := xxhash.New()
-	if _, err := io.Copy(hash, f); err != nil {
-		f.Close()
-		return nil
-	}
-	f.Close()
-
-	fh.Hash = hash.Sum(nil)
+	fh.Hash = GetHashValue(PathOnDisk, dontHash)
 	return fh
 }
 
+func GetHashValue(fpath string, dontHash bool) []byte {
+	f, err := os.Open(fpath)
+	if err != nil {
+		return nil
+	}
+	if !dontHash {
+		hash := xxhash.New()
+		if _, err := io.Copy(hash, f); err != nil {
+			f.Close()
+			return nil
+		}
+		f.Close()
+
+		return hash.Sum(nil)
+	} else {
+		fi, err := f.Stat()
+		if err != nil {
+			return nil
+		}
+		size := fi.Size()
+		time := fi.ModTime().Unix()
+		return []byte{byte(0xff & size), byte(0xff & (size >> 8)), byte(0xff & (size >> 16)), byte(0xff & (size >> 32)),
+			byte(0xff & (size >> 40)), byte(0xff & (size >> 48)), byte(0xff & (size >> 56)), byte(0xff & (size >> 64)),
+			byte(0xff & time), byte(0xff & (time >> 8)), byte(0xff & (time >> 16)), byte(0xff & (time >> 32)),
+			byte(0xff & (time >> 40)), byte(0xff & (time >> 48)), byte(0xff & (time >> 56)), byte(0xff & (time >> 64)),
+		}
+	}
+}
+
 // HashDir recursively searches through a directory, hashing every file, and returning them as a list []*FileHash.
-func HashDir(path string) (map[string]*FileHash, error) {
+func HashDir(path string, dontHash bool) (map[string]*FileHash, error) {
 	files, err := filePathWalkDir(path)
 	if err != nil {
 		return nil, err
@@ -92,17 +110,7 @@ func HashDir(path string) (map[string]*FileHash, error) {
 		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
 			continue
 		}
-		f, err := os.Open(file)
-		if err != nil {
-			return nil, err
-		}
-		hash := xxhash.New()
-		if _, err := io.Copy(hash, f); err != nil {
-			f.Close()
-			return nil, err
-		}
-		f.Close()
-		hashes[file] = &FileHash{PathOnDisk: file, Hash: hash.Sum(nil)}
+		hashes[file] = &FileHash{PathOnDisk: file, Hash: GetHashValue(file, dontHash)}
 	}
 	return hashes, nil
 }

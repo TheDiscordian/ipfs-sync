@@ -66,7 +66,7 @@ func findInStringSlice(slice []string, val string) int {
 	return -1
 }
 
-func watchDir(dir string, nocopy bool) chan bool {
+func watchDir(dir string, nocopy bool, dontHash bool) chan bool {
 	dirSplit := strings.Split(dir, "/")
 	dirName := dirSplit[len(dirSplit)-2]
 
@@ -120,9 +120,9 @@ func watchDir(dir string, nocopy bool) chan bool {
 		if Hashes != nil {
 			HashLock.Lock()
 			if Hashes[fname] != nil {
-				Hashes[fname].Recalculate(fname)
+				Hashes[fname].Recalculate(fname, dontHash)
 			} else {
-				Hashes[fname] = new(FileHash).Recalculate(fname)
+				Hashes[fname] = new(FileHash).Recalculate(fname, dontHash)
 			}
 			Hashes[fname].Update()
 			HashLock.Unlock()
@@ -342,12 +342,9 @@ func AddDir(path string, nocopy bool) (string, error) {
 		if makeDir {
 			localDirs[parentDir] = true
 		}
-		repl, err := AddFile(file, dirName+"/"+file[len(path):], nocopy, makeDir, false)
-		if err != nil || repl != "" {
-			//if repl != "" { FIXME check if resp is really an error before deciding it is
-			//	err = errors.New(repl)
-			//}
-			return "", err
+		_, err := AddFile(file, dirName+"/"+file[len(path):], nocopy, makeDir, false)
+		if err != nil {
+			log.Println("Error adding file:", err)
 		}
 	}
 	cid := GetFileCID(dirName)
@@ -658,7 +655,7 @@ func WatchDog() {
 				log.Println("Hashing", dk.Dir, "...")
 			}
 
-			hashmap, err := HashDir(dk.Dir)
+			hashmap, err := HashDir(dk.Dir, dk.DontHash)
 			if err != nil {
 				log.Panicln("Error hashing directory for hash DB:", err)
 			}
@@ -701,7 +698,7 @@ func WatchDog() {
 				}
 				found = true
 				log.Println(dk.ID, "loaded:", ik.Id)
-				watchDir(dk.Dir, dk.Nocopy)
+				watchDir(dk.Dir, dk.Nocopy, dk.DontHash)
 				break
 			}
 		}
@@ -717,7 +714,7 @@ func WatchDog() {
 		}
 		Publish(dk.CID, dk.ID)
 		log.Println(dk.ID, "loaded:", ik.Id)
-		watchDir(dk.Dir, dk.Nocopy)
+		watchDir(dk.Dir, dk.Nocopy, dk.DontHash)
 	}
 
 	// Main loop

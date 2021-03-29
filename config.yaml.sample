@@ -16,9 +16,12 @@ Dirs:
 #    Dir: /home/user/Documents/
 ## If true, use filestore (if enabled on IPFS daemon)
 #    Nocopy: false
+## If true, will use filesize+modification date to track changes, instead of hashing. Recommended if you have a very large directory.
+#    DontHash: false
 #  - ID: Example2
 #    Dir: /home/user/Pictures/
 #    Nocopy: false
+#    DontHash: false
 
 # Relative MFS directory path (default "/ipfs-sync/")
 BasePath: /ipfs-sync/

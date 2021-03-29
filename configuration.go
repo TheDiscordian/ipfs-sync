@@ -19,9 +19,10 @@ var content embed.FS
 // DirKey used for keeping track of directories, and it's used in the `dirs` config paramerter.
 type DirKey struct {
 	// config values
-	ID     string `json:"ID" yaml:"ID"`
-	Dir    string `yaml:"Dir"`
-	Nocopy bool   `yaml:"Nocopy"`
+	ID       string `json:"ID" yaml:"ID"`
+	Dir      string `yaml:"Dir"`
+	Nocopy   bool   `yaml:"Nocopy"`
+	DontHash bool   `yaml:"DontHash"`
 
 	// probably best to let this be managed automatically
 	CID     string
@@ -104,7 +105,6 @@ func loadConfig(path string) {
 		log.Println("[ERROR] Skipping config file...")
 		return
 	}
-	fmt.Println(cfg)
 	if cfg.BasePath != "" {
 		BasePath = cfg.BasePath
 	}
