@@ -302,6 +302,9 @@ func MakeDir(path string) error {
 func filePathWalkDir(root string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(path string, info fs.DirEntry, err error) error {
+		if info == nil {
+			return errors.New(fmt.Sprintf("cannot access '%s' for crawling", path))
+		}
 		if !info.IsDir() {
 			filePathSplit := strings.Split(path, "/")
 			if IgnoreHidden && filePathSplit[len(filePathSplit)-1][0] == '.' {
