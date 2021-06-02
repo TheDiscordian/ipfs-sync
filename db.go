@@ -67,19 +67,20 @@ func (fh *FileHash) Recalculate(PathOnDisk string, dontHash bool) *FileHash {
 }
 
 func GetHashValue(fpath string, dontHash bool) []byte {
-	f, err := os.Open(fpath)
-	if err != nil {
-		return nil
-	}
-	defer f.Close()
 	if !dontHash {
-		hash := xxhash.New()
-		if _, err := io.Copy(hash, f); err != nil {
+		f, err := os.Open(fpath)
+		if err != nil {
 			return nil
 		}
+		hash := xxhash.New()
+		if _, err := io.Copy(hash, f); err != nil {
+			f.Close()
+			return nil
+		}
+		f.Close()
 		return hash.Sum(nil)
 	} else {
-		fi, err := f.Stat()
+		fi, err := os.Stat(fpath)
 		if err != nil {
 			return nil
 		}
