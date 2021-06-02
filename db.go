@@ -71,14 +71,12 @@ func GetHashValue(fpath string, dontHash bool) []byte {
 	if err != nil {
 		return nil
 	}
+	defer f.Close()
 	if !dontHash {
 		hash := xxhash.New()
 		if _, err := io.Copy(hash, f); err != nil {
-			f.Close()
 			return nil
 		}
-		f.Close()
-
 		return hash.Sum(nil)
 	} else {
 		fi, err := f.Stat()
