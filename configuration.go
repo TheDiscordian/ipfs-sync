@@ -156,7 +156,7 @@ func ProcessFlags() {
 
 	// Process Dir
 	if len(DirKeys) == 0 {
-		log.Fatalln(`dirs field is required as flag, or in config (ex: {"ID":"UniqueIdentifier", "Dir":"/path/to/dir/to/sync/", "Nocopy": false}).`)
+		log.Fatalln(`dirs field is required as flag, or in config.`)
 	} else { // Check if Dir entries are at least somewhat valid.
 		for _, dk := range DirKeys {
 			if len(dk.Dir) == 0 {
