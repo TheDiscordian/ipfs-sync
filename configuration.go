@@ -74,6 +74,7 @@ type ConfigFileStruct struct {
 	Ignore       []string  `yaml:"Ignore"`
 	DB           string    `yaml:"DB"`
 	IgnoreHidden bool      `yaml:"IgnoreHidden"`
+	Timeout      string    `yaml:"Timeout"`
 }
 
 func loadConfig(path string) {
@@ -120,6 +121,14 @@ func loadConfig(path string) {
 			log.Println("[ERROR] Error processing sync in config file:", err)
 		} else {
 			SyncTime = tsTime
+		}
+	}
+	if cfg.Timeout != "" {
+		tsTime, err := time.ParseDuration(cfg.Timeout)
+		if err != nil {
+			log.Println("[ERROR] Error processing timeout in config file:", err)
+		} else {
+			TimeoutTime = tsTime
 		}
 	}
 	if cfg.DB != "" {
@@ -177,7 +186,7 @@ func ProcessFlags() {
 	if *EndPointFlag != "http://127.0.0.1:5001" || EndPoint == "" {
 		EndPoint = *EndPointFlag
 	}
-	_, err := doRequest("version")
+	_, err := doRequest(TimeoutTime, "version")
 	if err != nil {
 		log.Fatalln("Failed to connect to end point:", err)
 	}

@@ -41,3 +41,6 @@ IgnoreHidden: true
 
 # Time to sleep between IPNS syncs (ex: 120s) (default 10s)
 Sync: 10s
+
+# Timeout for simple commands like `version` and `files/mkdir`. Ignored for calls that are expected to take a while like `add`.
+Timeout: 30s

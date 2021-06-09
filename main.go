@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -36,6 +37,8 @@ var (
 	DirKeys          []*DirKey
 	SyncTimeFlag     = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
 	SyncTime         time.Duration
+	TimeoutTimeFlag  = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like `version` and `files/mkdir` (ex: 60s)")
+	TimeoutTime      time.Duration
 	ConfigFileFlag   = flag.String("config", "", "path to config file to use")
 	ConfigFile       string
 	IgnoreFlag       = new(IgnoreStruct)
@@ -242,9 +245,16 @@ func watchDir(dir string, nocopy bool, dontHash bool) chan bool {
 	return done
 }
 
-func doRequest(cmd string) (string, error) {
+// doRequest does an API request to the node specified in EndPoint. If timeout is 0 it isn't used.
+func doRequest(timeout time.Duration, cmd string) (string, error) {
+	var cancel context.CancelFunc
+	ctx := context.Background()
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	c := &http.Client{}
-	req, err := http.NewRequest("POST", EndPoint+API+cmd, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", EndPoint+API+cmd, nil)
 	if err != nil {
 		return "", err
 	}
@@ -276,7 +286,7 @@ type HashStruct struct {
 
 // GetFileCID gets a file CID based on MFS path relative to BasePath.
 func GetFileCID(filePath string) string {
-	out, _ := doRequest("files/stat?hash=true&arg=" + url.QueryEscape(BasePath+filePath))
+	out, _ := doRequest(TimeoutTime, "files/stat?hash=true&arg="+url.QueryEscape(BasePath+filePath))
 
 	fStat := new(HashStruct)
 
@@ -289,13 +299,13 @@ func GetFileCID(filePath string) string {
 
 // RemoveFile removes a file from the MFS relative to BasePath.
 func RemoveFile(fpath string) error {
-	_, err := doRequest(fmt.Sprintf(`files/rm?arg=%s&force=true`, url.QueryEscape(BasePath+fpath)))
+	_, err := doRequest(TimeoutTime, fmt.Sprintf(`files/rm?arg=%s&force=true`, url.QueryEscape(BasePath+fpath)))
 	return err
 }
 
 // MakeDir makes a directory along with parents in path
 func MakeDir(path string) error {
-	_, err := doRequest(fmt.Sprintf(`files/mkdir?arg=%s&parents=true`, url.QueryEscape(BasePath+path)))
+	_, err := doRequest(TimeoutTime, fmt.Sprintf(`files/mkdir?arg=%s&parents=true`, url.QueryEscape(BasePath+path)))
 	return err
 }
 
@@ -410,10 +420,11 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 
 	if makedir {
 		toSplit := strings.Split(to, "/")
+		parent := strings.Join(toSplit[:len(toSplit)-1], "/")
 		if Verbose {
-			log.Println("Creating parent directory...")
+			log.Printf("Creating parent directory '%s' in MFS...\n", parent)
 		}
-		err = MakeDir(strings.Join(toSplit[:len(toSplit)-1], "/"))
+		err = MakeDir(parent)
 		if err != nil {
 			return "", err
 		}
@@ -430,7 +441,7 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 	if Verbose {
 		log.Println("Adding file to mfs path:", BasePath+to)
 	}
-	_, err = doRequest(fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
+	_, err = doRequest(TimeoutTime, fmt.Sprintf(`files/cp?arg=%s&arg=%s`, "/ipfs/"+url.QueryEscape(hash.Hash), url.QueryEscape(BasePath+to)))
 	if err != nil {
 		if Verbose {
 			log.Println("Error on files/cp:", err)
@@ -495,10 +506,10 @@ func CleanFilestore() {
 		}
 		if fsEntry.Status == NoFile { // if the block points to a file that doesn't exist, remove it.
 			log.Println("Removing reference from filestore:", fsEntry.Key.Slash)
-			for _, err := doRequest("block/rm?arg=" + fsEntry.Key.Slash); err != nil && strings.HasPrefix(err.Error(), "pinned"); _, err = doRequest("block/rm?arg=" + fsEntry.Key.Slash) {
+			for _, err := doRequest(TimeoutTime, "block/rm?arg="+fsEntry.Key.Slash); err != nil && strings.HasPrefix(err.Error(), "pinned"); _, err = doRequest(TimeoutTime, "block/rm?arg="+fsEntry.Key.Slash) {
 				cid := strings.Split(err.Error(), " ")[2]
 				log.Println("Effected block is pinned, removing pin:", cid)
-				_, err := doRequest("pin/rm?arg=" + cid)
+				_, err := doRequest(0, "pin/rm?arg="+cid) // no timeout
 				if err != nil {
 					log.Println("Error removing pin:", err)
 				}
@@ -523,7 +534,7 @@ func HandleBadBlockError(err error) bool {
 
 // Pin CID
 func Pin(cid string) error {
-	resp, err := doRequest("pin/add?arg=" + url.QueryEscape(cid))
+	resp, err := doRequest(0, "pin/add?arg="+url.QueryEscape(cid)) // no timeout
 	if resp != "" {
 		if Verbose {
 			log.Println("Pin response:", resp)
@@ -553,7 +564,7 @@ func (es *ErrorStruct) Error() string {
 
 // UpdatePin updates a recursive pin to a new CID, unpinning old content.
 func UpdatePin(from, to string) {
-	_, err := doRequest("pin/update?arg=" + url.QueryEscape(from) + "&arg=" + url.QueryEscape(to))
+	_, err := doRequest(0, "pin/update?arg="+url.QueryEscape(from)+"&arg="+url.QueryEscape(to)) // no timeout
 	if err != nil {
 		log.Println("Error updating pin:", err)
 		if Verbose {
@@ -587,7 +598,7 @@ type Keys struct {
 // ListKeys lists all the keys in the IPFS daemon.
 // TODO Only return keys in the namespace.
 func ListKeys() *Keys {
-	res, err := doRequest("key/list")
+	res, err := doRequest(TimeoutTime, "key/list")
 	if err != nil {
 		log.Println("[ERROR]", err)
 		return nil
@@ -603,7 +614,7 @@ func ListKeys() *Keys {
 
 // ResolveIPNS takes an IPNS key and returns the CID it resolves to.
 func ResolveIPNS(key string) (string, error) {
-	res, err := doRequest("name/resolve?arg=" + key)
+	res, err := doRequest(0, "name/resolve?arg="+key) // no timeout
 	if err != nil {
 		return "", err
 	}
@@ -624,7 +635,7 @@ func ResolveIPNS(key string) (string, error) {
 
 // Generates an IPNS key in the keyspace based on name.
 func GenerateKey(name string) Key {
-	res, err := doRequest("key/gen?arg=" + KeySpace + name)
+	res, err := doRequest(TimeoutTime, "key/gen?arg="+KeySpace+name)
 	if err != nil {
 		log.Panicln("[ERROR]", err)
 	}
@@ -638,7 +649,7 @@ func GenerateKey(name string) Key {
 
 // Publish CID to IPNS
 func Publish(cid, key string) error {
-	_, err := doRequest(fmt.Sprintf("name/publish?arg=%s&key=%s", url.QueryEscape(cid), KeySpace+key))
+	_, err := doRequest(0, fmt.Sprintf("name/publish?arg=%s&key=%s", url.QueryEscape(cid), KeySpace+key)) // no timeout
 	return err
 }
 
