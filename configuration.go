@@ -207,7 +207,7 @@ func ProcessFlags() {
 		SyncTime = *SyncTimeFlag
 	}
 	if *TimeoutTimeFlag != time.Second*30 || TimeoutTime == 0 {
-		SyncTime = *TimeoutTimeFlag
+		TimeoutTime = *TimeoutTimeFlag
 	}
 	if *IgnoreHiddenFlag {
 		IgnoreHidden = true
