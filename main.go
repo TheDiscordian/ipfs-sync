@@ -37,7 +37,7 @@ var (
 	DirKeys          []*DirKey
 	SyncTimeFlag     = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
 	SyncTime         time.Duration
-	TimeoutTimeFlag  = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like `version` and `files/mkdir` (ex: 60s)")
+	TimeoutTimeFlag  = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like 'version' and 'files/mkdir' (ex: 60s)")
 	TimeoutTime      time.Duration
 	ConfigFileFlag   = flag.String("config", "", "path to config file to use")
 	ConfigFile       string

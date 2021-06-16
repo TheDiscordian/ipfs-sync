@@ -47,7 +47,7 @@ Usage of ipfs-sync:
         ignore anything prefixed with "."
   -sync duration
         time to sleep between IPNS syncs (ex: 120s) (default 10s)
-  -timeout version
+  -timeout duration
         longest time to wait for API calls like version and `files/mkdir` (ex: 60s) (default 30s)
   -v    display verbose output
   -version
