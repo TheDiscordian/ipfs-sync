@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -27,38 +26,6 @@ const (
 	KeySpace = "ipfs-sync."
 	API      = "/api/v0/"
 )
-
-var (
-	BasePathFlag     = flag.String("basepath", "/ipfs-sync/", "relative MFS directory path")
-	BasePath         string
-	EndPointFlag     = flag.String("endpoint", "http://127.0.0.1:5001", "node to connect to over HTTP")
-	EndPoint         string
-	DirKeysFlag      = new(SyncDirs)
-	DirKeys          []*DirKey
-	SyncTimeFlag     = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
-	SyncTime         time.Duration
-	TimeoutTimeFlag  = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like 'version' and 'files/mkdir' (ex: 60s)")
-	TimeoutTime      time.Duration
-	ConfigFileFlag   = flag.String("config", "", "path to config file to use")
-	ConfigFile       string
-	IgnoreFlag       = new(IgnoreStruct)
-	Ignore           []string
-	LicenseFlag      = flag.Bool("copyright", false, "display copyright and exit")
-	DBPathFlag       = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync.db")`)
-	DBPath           string
-	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
-	IgnoreHidden     bool
-	VersionFlag      = flag.Bool("version", false, "display version and exit")
-	VerboseFlag      = flag.Bool("v", false, "display verbose output")
-	Verbose          bool
-
-	version string // passed by -ldflags
-)
-
-func init() {
-	flag.Var(DirKeysFlag, "dirs", `set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/", "Nocopy": false},{"ID":"Example2", "Dir":"/home/user/Pictures/", "Nocopy": false}]`)
-	flag.Var(IgnoreFlag, "ignore", `set the suffixes to ignore (default: ["kate-swp", "swp", "part", "crdownload"])`)
-}
 
 func findInStringSlice(slice []string, val string) int {
 	for i, item := range slice {
@@ -333,7 +300,7 @@ func filePathWalkDir(root string) ([]string, error) {
 }
 
 // AddDir adds a directory, and returns CID.
-func AddDir(path string, nocopy bool) (string, error) {
+func AddDir(path string, nocopy bool, pin bool) (string, error) {
 	pathSplit := strings.Split(path, "/")
 	dirName := pathSplit[len(pathSplit)-2]
 	files, err := filePathWalkDir(path)
@@ -361,7 +328,9 @@ func AddDir(path string, nocopy bool) (string, error) {
 		}
 	}
 	cid := GetFileCID(dirName)
-	err = Pin(cid)
+	if pin {
+		err = Pin(cid)
+	}
 	return cid, err
 }
 
@@ -723,7 +692,7 @@ func WatchDog() {
 		log.Println(dk.ID, "not found, generating...")
 		ik := GenerateKey(dk.ID)
 		var err error
-		dk.CID, err = AddDir(dk.Dir, dk.Nocopy)
+		dk.CID, err = AddDir(dk.Dir, dk.Nocopy, dk.Pin)
 		if err != nil {
 			log.Panicln("[ERROR] Failed to add directory:", err)
 		}
@@ -739,7 +708,9 @@ func WatchDog() {
 			if fCID := GetFileCID(dk.MFSPath); len(fCID) > 0 && fCID != dk.CID {
 				// log.Printf("[DEBUG] '%s' != '%s'", fCID, dk.CID)
 				Publish(fCID, dk.ID)
-				UpdatePin(dk.CID, fCID)
+				if dk.Pin {
+					UpdatePin(dk.CID, fCID)
+				}
 				dk.CID = fCID
 				log.Println(dk.MFSPath, "updated...")
 			}

@@ -18,10 +18,13 @@ Dirs:
 #    Nocopy: false
 ## If true, will use filesize+modification date to track changes, instead of hashing. Recommended if you have a very large directory.
 #    DontHash: false
+## If true, will pin the root directory
+#    Pin: false
 #  - ID: Example2
 #    Dir: /home/user/Pictures/
 #    Nocopy: false
 #    DontHash: false
+#    Pin: false
 
 # Relative MFS directory path (default "/ipfs-sync/")
 BasePath: /ipfs-sync/

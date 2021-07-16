@@ -13,6 +13,38 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+var (
+	BasePathFlag     = flag.String("basepath", "/ipfs-sync/", "relative MFS directory path")
+	BasePath         string
+	EndPointFlag     = flag.String("endpoint", "http://127.0.0.1:5001", "node to connect to over HTTP")
+	EndPoint         string
+	DirKeysFlag      = new(SyncDirs)
+	DirKeys          []*DirKey
+	SyncTimeFlag     = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
+	SyncTime         time.Duration
+	TimeoutTimeFlag  = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like 'version' and 'files/mkdir' (ex: 60s)")
+	TimeoutTime      time.Duration
+	ConfigFileFlag   = flag.String("config", "", "path to config file to use")
+	ConfigFile       string
+	IgnoreFlag       = new(IgnoreStruct)
+	Ignore           []string
+	LicenseFlag      = flag.Bool("copyright", false, "display copyright and exit")
+	DBPathFlag       = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync.db")`)
+	DBPath           string
+	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
+	IgnoreHidden     bool
+	VersionFlag      = flag.Bool("version", false, "display version and exit")
+	VerboseFlag      = flag.Bool("v", false, "display verbose output")
+	Verbose          bool
+
+	version string // passed by -ldflags
+)
+
+func init() {
+	flag.Var(DirKeysFlag, "dirs", `set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/", "Nocopy": false},{"ID":"Example2", "Dir":"/home/user/Pictures/", "Nocopy": false}]`)
+	flag.Var(IgnoreFlag, "ignore", `set the suffixes to ignore (default: ["kate-swp", "swp", "part", "crdownload"])`)
+}
+
 //go:embed config.yaml.sample
 var content embed.FS
 
@@ -23,6 +55,7 @@ type DirKey struct {
 	Dir      string `yaml:"Dir"`
 	Nocopy   bool   `yaml:"Nocopy"`
 	DontHash bool   `yaml:"DontHash"`
+	Pin      bool   `yaml:"Pin"`
 
 	// probably best to let this be managed automatically
 	CID     string
