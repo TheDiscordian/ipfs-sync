@@ -597,19 +597,17 @@ type Keys struct {
 
 // ListKeys lists all the keys in the IPFS daemon.
 // TODO Only return keys in the namespace.
-func ListKeys() *Keys {
+func ListKeys() (*Keys, error) {
 	res, err := doRequest(TimeoutTime, "key/list")
 	if err != nil {
-		log.Println("[ERROR]", err)
-		return nil
+		return nil, err
 	}
 	keys := new(Keys)
 	err = json.Unmarshal([]byte(res), keys)
 	if err != nil {
-		log.Println("[ERROR]", err)
-		return nil
+		return nil, err
 	}
-	return keys
+	return keys, nil
 }
 
 // ResolveIPNS takes an IPNS key and returns the CID it resolves to.
@@ -656,7 +654,10 @@ func Publish(cid, key string) error {
 // WatchDog watches for directory updates, periodically updates IPNS records, and updates recursive pins.
 func WatchDog() {
 	// Init WatchDog
-	keys := ListKeys()
+	keys, err := ListKeys()
+	if err != nil {
+		log.Fatalln("Failed to retrieve keys:", err)
+	}
 	for _, dk := range DirKeys {
 		found := false
 
