@@ -206,8 +206,8 @@ func ProcessFlags() {
 			}
 
 			// Check if trailing "/" exists, if not, append it.
-			if dk.Dir[len(dk.Dir)-1] != '/' {
-				dk.Dir = dk.Dir + "/"
+			if dk.Dir[len(dk.Dir)-1] != os.PathSeparator {
+				dk.Dir = dk.Dir + string(os.PathSeparator)
 			}
 		}
 	}
