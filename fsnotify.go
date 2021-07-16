@@ -10,15 +10,6 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-func findInStringSlice(slice []string, val string) int {
-	for i, item := range slice {
-		if item == val {
-			return i
-		}
-	}
-	return -1
-}
-
 func watchDir(dir string, nocopy bool, dontHash bool) chan bool {
 	dirSplit := strings.Split(dir, string(os.PathSeparator))
 	dirName := dirSplit[len(dirSplit)-2]
