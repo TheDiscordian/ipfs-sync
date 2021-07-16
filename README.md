@@ -9,11 +9,13 @@
 
 ## Installation
 
+If your OS or architechture isn't supported, please open an issue! If it's easily supported with Go, I'll definitely consider it 😊.
+
 ### Binary
 
 If you're on an Arch based distro, `ipfs-sync` is available on the [AUR](https://aur.archlinux.org/packages/ipfs-sync/).
 
-Binaries are available on the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) page for other distros.
+Binaries are available on the [releases](https://github.com/TheDiscordian/ipfs-sync/releases) page for other distros and OSs.
 
 ### Source
 
