@@ -25,6 +25,15 @@ const (
 	API      = "/api/v0/"
 )
 
+func findInStringSlice(slice []string, val string) int {
+	for i, item := range slice {
+		if item == val {
+			return i
+		}
+	}
+	return -1
+}
+
 // doRequest does an API request to the node specified in EndPoint. If timeout is 0 it isn't used.
 func doRequest(timeout time.Duration, cmd string) (string, error) {
 	var cancel context.CancelFunc
