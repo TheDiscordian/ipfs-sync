@@ -36,6 +36,7 @@ var (
 	VersionFlag      = flag.Bool("version", false, "display version and exit")
 	VerboseFlag      = flag.Bool("v", false, "display verbose output")
 	Verbose          bool
+	EstuaryAPIKey    string // don't make this a flag
 
 	version string // passed by -ldflags
 )
@@ -56,6 +57,7 @@ type DirKey struct {
 	Nocopy   bool   `yaml:"Nocopy"`
 	DontHash bool   `yaml:"DontHash"`
 	Pin      bool   `yaml:"Pin"`
+	Estuary  bool   `yaml:"Estuary"`
 
 	// probably best to let this be managed automatically
 	CID     string
@@ -100,14 +102,15 @@ func (ig *IgnoreStruct) String() string {
 
 // ConfigFileStruct is used for loading information from the config file.
 type ConfigFileStruct struct {
-	BasePath     string    `yaml:"BasePath"`
-	EndPoint     string    `yaml:"EndPoint"`
-	Dirs         []*DirKey `yaml:"Dirs"`
-	Sync         string    `yaml:"Sync"`
-	Ignore       []string  `yaml:"Ignore"`
-	DB           string    `yaml:"DB"`
-	IgnoreHidden bool      `yaml:"IgnoreHidden"`
-	Timeout      string    `yaml:"Timeout"`
+	BasePath      string    `yaml:"BasePath"`
+	EndPoint      string    `yaml:"EndPoint"`
+	Dirs          []*DirKey `yaml:"Dirs"`
+	Sync          string    `yaml:"Sync"`
+	Ignore        []string  `yaml:"Ignore"`
+	DB            string    `yaml:"DB"`
+	IgnoreHidden  bool      `yaml:"IgnoreHidden"`
+	Timeout       string    `yaml:"Timeout"`
+	EstuaryAPIKey string    `yaml:"EstuaryAPIKey"`
 }
 
 func loadConfig(path string) {
@@ -168,6 +171,7 @@ func loadConfig(path string) {
 		DBPath = cfg.DB
 	}
 	IgnoreHidden = cfg.IgnoreHidden
+	EstuaryAPIKey = cfg.EstuaryAPIKey
 }
 
 // Process flags, and load config.

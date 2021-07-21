@@ -122,7 +122,7 @@ func filePathWalkDir(root string) ([]string, error) {
 }
 
 // AddDir adds a directory, and returns CID.
-func AddDir(path string, nocopy bool, pin bool) (string, error) {
+func AddDir(path string, nocopy bool, pin bool, estuary bool) (string, error) {
 	pathSplit := strings.Split(path, string(os.PathSeparator))
 	dirName := pathSplit[len(pathSplit)-2]
 	files, err := filePathWalkDir(path)
@@ -155,7 +155,13 @@ func AddDir(path string, nocopy bool, pin bool) (string, error) {
 	}
 	cid := GetFileCID(dirName)
 	if pin {
-		err = Pin(cid)
+		err := Pin(cid)
+		log.Println("Error pinning", dirName, ":", err)
+	}
+	if estuary {
+		if err := PinEstuary(cid, dirName); err != nil {
+			log.Println("Error pinning to Estuary:", err)
+		}
 	}
 	return cid, err
 }
@@ -241,9 +247,9 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 		if Verbose {
 			log.Println("Error on files/cp:", err)
 			log.Println("fpath:", from)
-			if HandleBadBlockError(err) {
-				log.Println("files/cp failure due to bad filestore, file not added")
-			}
+		}
+		if HandleBadBlockError(err) {
+			log.Println("files/cp failure due to bad filestore, file not added")
 		}
 	}
 	return hash.Hash, err
@@ -446,6 +452,50 @@ func Publish(cid, key string) error {
 	return err
 }
 
+type EstuaryFile struct {
+	Cid  string
+	Name string
+}
+
+func PinEstuary(cid, name string) error {
+	if EstuaryAPIKey == "" {
+		return errors.New("Estuary API key is blank, not pinning to Estuary.")
+	}
+	var cancel context.CancelFunc
+	ctx := context.Background()
+	if TimeoutTime > 0 {
+		ctx, cancel = context.WithTimeout(ctx, TimeoutTime)
+		defer cancel()
+	}
+	c := &http.Client{}
+	jsonData, _ := json.Marshal(&EstuaryFile{Cid: cid, Name: name})
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.estuary.tech/pinning/pins", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Authorization", "Bearer "+EstuaryAPIKey)
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := c.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	errStruct := new(ErrorStruct)
+	err = json.Unmarshal(body, errStruct)
+	if err == nil {
+		if errStruct.Error() != "" {
+			return errStruct
+		}
+	}
+
+	return nil
+}
+
 // WatchDog watches for directory updates, periodically updates IPNS records, and updates recursive pins.
 func WatchDog() {
 	// Init WatchDog
@@ -522,7 +572,7 @@ func WatchDog() {
 		log.Println(dk.ID, "not found, generating...")
 		ik := GenerateKey(dk.ID)
 		var err error
-		dk.CID, err = AddDir(dk.Dir, dk.Nocopy, dk.Pin)
+		dk.CID, err = AddDir(dk.Dir, dk.Nocopy, dk.Pin, dk.Estuary)
 		if err != nil {
 			log.Panicln("[ERROR] Failed to add directory:", err)
 		}
@@ -540,6 +590,11 @@ func WatchDog() {
 				Publish(fCID, dk.ID)
 				if dk.Pin {
 					UpdatePin(dk.CID, fCID)
+				}
+				if dk.Estuary {
+					if err := PinEstuary(fCID, strings.Split(dk.MFSPath, "/")[0]); err != nil {
+						log.Println("Error pinning to Estuary:", err)
+					}
 				}
 				dk.CID = fCID
 				log.Println(dk.MFSPath, "updated...")

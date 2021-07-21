@@ -8,6 +8,9 @@
 # Path to file where db should be stored (example: "/home/user/.ipfs-sync.db")
 DB:
 
+# API key for Estuary (optional, find out more at https://estuary.tech)
+EstuaryAPIKey:
+
 # Set the dirs to monitor: 
 Dirs:
 ## Unique identifier for the IPNS key
@@ -20,6 +23,8 @@ Dirs:
 #    DontHash: false
 ## If true, will pin the root directory
 #    Pin: false
+## If true, and EstuaryAPIKey is set, will attempt to pin the CID via Estuary as well
+#    Estuary: false
 #  - ID: Example2
 #    Dir: /home/user/Pictures/
 #    Nocopy: false
