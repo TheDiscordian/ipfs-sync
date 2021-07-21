@@ -8,9 +8,6 @@
 # Path to file where db should be stored (example: "/home/user/.ipfs-sync.db")
 DB:
 
-# API key for Estuary (optional, find out more at https://estuary.tech)
-EstuaryAPIKey:
-
 # Set the dirs to monitor: 
 Dirs:
 ## Unique identifier for the IPNS key
@@ -30,6 +27,9 @@ Dirs:
 #    Nocopy: false
 #    DontHash: false
 #    Pin: false
+
+# API key for Estuary (optional, find out more at https://estuary.tech)
+EstuaryAPIKey:
 
 # Relative MFS directory path (default "/ipfs-sync/")
 BasePath: /ipfs-sync/
