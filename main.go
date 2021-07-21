@@ -457,9 +457,23 @@ type EstuaryFile struct {
 	Name string
 }
 
-func PinEstuary(cid, name string) error {
+type IPFSRemotePinningResponse struct {
+	Count   int
+	Results []*IPFSRemotePinResult
+}
+
+type IPFSRemotePinResult struct {
+	RequestId string
+	Pin       *IPFSRemotePin
+}
+
+type IPFSRemotePin struct {
+	Cid string
+}
+
+func doEstuaryRequest(reqType, cmd string, jsonData []byte) (string, error) {
 	if EstuaryAPIKey == "" {
-		return errors.New("Estuary API key is blank, not pinning to Estuary.")
+		return "", errors.New("Estuary API key is blank.")
 	}
 	var cancel context.CancelFunc
 	ctx := context.Background()
@@ -468,32 +482,86 @@ func PinEstuary(cid, name string) error {
 		defer cancel()
 	}
 	c := &http.Client{}
-	jsonData, _ := json.Marshal(&EstuaryFile{Cid: cid, Name: name})
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.estuary.tech/pinning/pins", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
+
+	var (
+		req *http.Request
+		err error
+	)
+	if jsonData != nil {
+		req, err = http.NewRequestWithContext(ctx, reqType, "https://api.estuary.tech/"+cmd, bytes.NewBuffer(jsonData))
+	} else {
+		req, err = http.NewRequestWithContext(ctx, reqType, "https://api.estuary.tech/"+cmd, nil)
 	}
+	if err != nil {
+		return "", err
+	}
+
 	req.Header.Add("Authorization", "Bearer "+EstuaryAPIKey)
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := c.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	errStruct := new(ErrorStruct)
 	err = json.Unmarshal(body, errStruct)
 	if err == nil {
 		if errStruct.Error() != "" {
-			return errStruct
+			return string(body), errStruct
 		}
 	}
 
-	return nil
+	return string(body), nil
+}
+
+func PinEstuary(cid, name string) error {
+	jsonData, _ := json.Marshal(&EstuaryFile{Cid: cid, Name: name})
+	_, err := doEstuaryRequest("POST", "pinning/pins", jsonData)
+	return err
+}
+
+func UpdatePinEstuary(oldcid, newcid, name string) {
+	log.Println("[DEBUG] Estuary update:", oldcid, newcid, name)
+	resp, err := doEstuaryRequest("GET", "pinning/pins?cid="+oldcid, nil)
+	if err != nil {
+		log.Println("Error getting Estuary pin:", err)
+		return
+	}
+	pinResp := new(IPFSRemotePinningResponse)
+	err = json.Unmarshal([]byte(resp), pinResp)
+	if err != nil {
+		log.Println("Error decoding Estuary pin list:", err)
+		return
+	}
+	// FIXME Estuary doesn't seem to support `cid` GET field yet, this code can be removed when it does:
+	var reqId string
+	pinResp.Count = 0
+	for _, pinResult := range pinResp.Results {
+		if pinResult.Pin.Cid == oldcid {
+			reqId = pinResult.RequestId
+			pinResp.Count = 1
+			break
+		}
+	}
+	// END OF FIXME
+	jsonData, _ := json.Marshal(&EstuaryFile{Cid: newcid, Name: name})
+	if pinResp.Count > 0 {
+		_, err := doEstuaryRequest("POST", "pinning/pins/"+reqId, jsonData)
+		if err != nil {
+			log.Println("Error updating Estuary pin:", err)
+		} else {
+			return
+		}
+	}
+	err = PinEstuary(newcid, name)
+	if err != nil {
+		log.Println("Error pinning to Estuary:", err)
+	}
 }
 
 // WatchDog watches for directory updates, periodically updates IPNS records, and updates recursive pins.
@@ -587,15 +655,13 @@ func WatchDog() {
 		for _, dk := range DirKeys {
 			if fCID := GetFileCID(dk.MFSPath); len(fCID) > 0 && fCID != dk.CID {
 				// log.Printf("[DEBUG] '%s' != '%s'", fCID, dk.CID)
-				Publish(fCID, dk.ID)
 				if dk.Pin {
 					UpdatePin(dk.CID, fCID)
 				}
 				if dk.Estuary {
-					if err := PinEstuary(fCID, strings.Split(dk.MFSPath, "/")[0]); err != nil {
-						log.Println("Error pinning to Estuary:", err)
-					}
+					UpdatePinEstuary(dk.CID, fCID, strings.Split(dk.MFSPath, "/")[0])
 				}
+				Publish(fCID, dk.ID)
 				dk.CID = fCID
 				log.Println(dk.MFSPath, "updated...")
 			}
