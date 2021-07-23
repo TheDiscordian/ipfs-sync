@@ -34,11 +34,11 @@ Usage of ipfs-sync:
   -basepath string
         relative MFS directory path (default "/ipfs-sync/")
   -config string
-        path to config file to use
+        path to config file to use (default "/home/user/.ipfs-sync.yaml")
   -copyright
         display copyright and exit
   -db string
-        path to file where db should be stored (example: "/home/user/.ipfs-sync.db")
+        path to file where db should be stored (default "/home/user/.ipfs-sync.db")
   -dirs value
         set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/", "Nocopy": false},{"ID":"Example2", "Dir":"/home/user/Pictures/", "Nocopy": false}]
   -endpoint string
@@ -50,7 +50,7 @@ Usage of ipfs-sync:
   -sync duration
         time to sleep between IPNS syncs (ex: 120s) (default 10s)
   -timeout duration
-        longest time to wait for API calls like version and `files/mkdir` (ex: 60s) (default 30s)
+        longest time to wait for API calls like 'version' and 'files/mkdir' (ex: 60s) (default 30s)
   -v    display verbose output
   -version
         display version and exit
