@@ -269,8 +269,20 @@ type FileStoreEntry struct {
 	Key    FileStoreKey
 }
 
+var fileStoreCleanupLock chan int
+
+func init() {
+	fileStoreCleanupLock = make(chan int, 1)
+}
+
 // CleanFilestore removes blocks that point to files that don't exist
 func CleanFilestore() {
+	select {
+	case fileStoreCleanupLock <- 1:
+		defer func() { <-fileStoreCleanupLock }()
+	default:
+		return
+	}
 	if Verbose {
 		log.Println("Removing blocks that point to a file that doesn't exist from filestore...")
 	}
