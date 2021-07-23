@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func init() {
 	EndPoint = "http://127.0.0.1:5001"
@@ -28,5 +31,7 @@ func TestResolveIPNS(t *testing.T) {
 }
 
 func TestCleanFilestore(t *testing.T) {
-	CleanFilestore()
+	if !HandleBadBlockError(errors.New("no such file or directory")) {
+		t.Error("Failed to cleanup bad block!")
+	}
 }
