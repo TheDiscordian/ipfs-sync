@@ -24,12 +24,12 @@ var (
 	SyncTime         time.Duration
 	TimeoutTimeFlag  = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like 'version' and 'files/mkdir' (ex: 60s)")
 	TimeoutTime      time.Duration
-	ConfigFileFlag   = flag.String("config", "", "path to config file to use")
+	ConfigFileFlag   = flag.String("config", getHomeDir()+".ipfs-sync.yaml", "path to config file to use")
 	ConfigFile       string
 	IgnoreFlag       = new(IgnoreStruct)
 	Ignore           []string
 	LicenseFlag      = flag.Bool("copyright", false, "display copyright and exit")
-	DBPathFlag       = flag.String("db", "", `path to file where db should be stored (example: "/home/user/.ipfs-sync.db")`)
+	DBPathFlag       = flag.String("db", getHomeDir()+".ipfs-sync.db", `path to file where db should be stored`)
 	DBPath           string
 	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
 	IgnoreHidden     bool
@@ -44,6 +44,11 @@ var (
 func init() {
 	flag.Var(DirKeysFlag, "dirs", `set the dirs to monitor in json format like: [{"ID":"Example1", "Dir":"/home/user/Documents/", "Nocopy": false},{"ID":"Example2", "Dir":"/home/user/Pictures/", "Nocopy": false}]`)
 	flag.Var(IgnoreFlag, "ignore", `set the suffixes to ignore (default: ["kate-swp", "swp", "part", "crdownload"])`)
+}
+
+func getHomeDir() string {
+	homeDir, _ := os.UserHomeDir()
+	return homeDir + string(os.PathSeparator)
 }
 
 //go:embed config.yaml.sample
