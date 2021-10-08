@@ -8,6 +8,9 @@
 # Path to file where db should be stored (example: "/home/user/.ipfs-sync.db")
 DB:
 
+# Verify filestore integrity on startup (ignored if no dirs use "nocopy")
+VerifyFilestore: false
+
 # Set the dirs to monitor: 
 Dirs:
 ## Unique identifier for the IPNS key

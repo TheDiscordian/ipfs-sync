@@ -166,14 +166,11 @@ func AddDir(path string, nocopy bool, pin bool, estuary bool) (string, error) {
 	return cid, err
 }
 
-// AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added.
-// If makedir is true, it'll create the directory it'll be placed in.
-// If overwrite is true, it'll perform an rm before copying to MFS.
-func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string, error) {
-	log.Println("Adding file from", from, "to", BasePath+to, "...")
-	f, err := os.Open(from)
+// A simple IPFS add, if onlyhash is true, only the CID is generated and returned
+func IPFSAddFile(fpath string, nocopy, onlyhash bool) (*HashStruct, error) {
+	f, err := os.Open(fpath)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer f.Close()
 
@@ -181,7 +178,7 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 	writer := multipart.NewWriter(buff)
 
 	h := make(textproto.MIMEHeader)
-	h.Set("Abspath", from)
+	h.Set("Abspath", fpath)
 	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", url.QueryEscape(f.Name())))
 	h.Set("Content-Type", "application/octet-stream")
 	part, _ := writer.CreatePart(h)
@@ -193,9 +190,9 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 	writer.Close()
 
 	c := &http.Client{}
-	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true`, nocopy), buff)
+	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true&only-hash=%t`, nocopy, onlyhash), buff)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	req.Header.Add("Content-Type", writer.FormDataContentType())
 
@@ -204,12 +201,12 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 	}
 	resp, err := c.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	dec := json.NewDecoder(resp.Body)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	hash := new(HashStruct)
@@ -217,6 +214,19 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 
 	if Verbose {
 		log.Println("File hash:", hash.Hash)
+	}
+
+	return hash, err
+}
+
+// AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added.
+// If makedir is true, it'll create the directory it'll be placed in.
+// If overwrite is true, it'll perform an rm before copying to MFS.
+func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string, error) {
+	log.Println("Adding file from", from, "to", BasePath+to, "...")
+	hash, err := IPFSAddFile(from, nocopy, false)
+	if err != nil {
+		return "", err
 	}
 
 	if makedir {
@@ -248,8 +258,9 @@ func AddFile(from, to string, nocopy bool, makedir bool, overwrite bool) (string
 			log.Println("Error on files/cp:", err)
 			log.Println("fpath:", from)
 		}
-		if HandleBadBlockError(err) {
-			log.Println("files/cp failure due to bad filestore, file not added")
+		if HandleBadBlockError(err, from, nocopy) {
+			log.Println("files/cp failure due to filestore, retrying (recursive)")
+			AddFile(from, to, nocopy, makedir, overwrite)
 		}
 	}
 	return hash.Hash, err
@@ -273,6 +284,88 @@ var fileStoreCleanupLock chan int
 
 func init() {
 	fileStoreCleanupLock = make(chan int, 1)
+}
+
+// FileStoreEntry is for results returned by `filestore/verify`, only processes Status and Key, as that's all ipfs-sync uses.
+type RefResp struct {
+	Err string
+	Ref string
+}
+
+// Completely removes a CID, even if pinned
+func RemoveCID(cid string) {
+	var found bool
+	// Build our own request because we want to stream data...
+	c := &http.Client{}
+	req, err := http.NewRequest("POST", EndPoint+API+"refs?unique=true&recursive=true&arg="+cid, nil)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// Send request
+	resp, err := c.Do(req)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	// Decode the json stream and process it
+	for dec.More() {
+		found = true
+		refResp := new(RefResp)
+		err := dec.Decode(refResp)
+		if err != nil {
+			log.Println("Error decoding ref response stream:", err)
+			continue
+		}
+
+		newcid := refResp.Ref
+		if newcid == "" {
+			newcid = cid
+		}
+
+		if Verbose {
+			log.Println("Removing block:", newcid)
+		}
+		RemoveBlock(newcid)
+	}
+	if !found {
+		if Verbose {
+			log.Println("Removing block:", cid)
+		}
+		RemoveBlock(cid)
+	}
+}
+
+// remove block, even if pinned
+func RemoveBlock(cid string) {
+	var err error
+	for _, err = doRequest(TimeoutTime, "block/rm?arg="+cid); err != nil && strings.HasPrefix(err.Error(), "pinned"); _, err = doRequest(TimeoutTime, "block/rm?arg="+cid) {
+		splitErr := strings.Split(err.Error(), " ")
+		var cid2 string
+		if len(splitErr) < 3 { // This is caused by IPFS returning "pinned (recursive)", it means the file in question has been explicitly pinned, and for some unknown reason, it chooses to omit the CID in this particular situation
+			cid2 = cid
+		} else {
+			cid2 = splitErr[2]
+		}
+		log.Println("Effected block is pinned, removing pin:", cid2)
+		_, err := doRequest(0, "pin/rm?arg="+cid2) // no timeout
+		if err != nil {
+			log.Println("Error removing pin:", err)
+		}
+	}
+
+	if err != nil {
+		log.Println("Error removing bad block:", err)
+	}
 }
 
 // CleanFilestore removes blocks that point to files that don't exist
@@ -319,27 +412,28 @@ func CleanFilestore() {
 		}
 		if fsEntry.Status == NoFile { // if the block points to a file that doesn't exist, remove it.
 			log.Println("Removing reference from filestore:", fsEntry.Key.Slash)
-			for _, err := doRequest(TimeoutTime, "block/rm?arg="+fsEntry.Key.Slash); err != nil && strings.HasPrefix(err.Error(), "pinned"); _, err = doRequest(TimeoutTime, "block/rm?arg="+fsEntry.Key.Slash) {
-				cid := strings.Split(err.Error(), " ")[2]
-				log.Println("Effected block is pinned, removing pin:", cid)
-				_, err := doRequest(0, "pin/rm?arg="+cid) // no timeout
-				if err != nil {
-					log.Println("Error removing pin:", err)
-				}
-			}
-
-			if err != nil {
-				log.Println("Error removing bad block:", err)
-			}
+			RemoveBlock(fsEntry.Key.Slash)
 		}
 	}
 }
 
 // HandleBackBlockError runs CleanFilestore() and returns true if there was a bad block error.
-func HandleBadBlockError(err error) bool {
+func HandleBadBlockError(err error, fpath string, nocopy bool) bool {
 	txt := err.Error()
 	if strings.HasPrefix(txt, "failed to get block") || strings.HasSuffix(txt, "no such file or directory") {
-		CleanFilestore()
+		if Verbose {
+			log.Println("Handling bad block error: " + txt)
+		}
+		if fpath == "" { // TODO attempt to get fpath from error msg when possible
+			CleanFilestore()
+		} else {
+			cid, err := IPFSAddFile(fpath, nocopy, true)
+			if err == nil {
+				RemoveCID(cid.Hash)
+			} else {
+				log.Println("Error handling bad block error:", err)
+			}
+		}
 		return true
 	}
 	return false
@@ -376,18 +470,18 @@ func (es *ErrorStruct) Error() string {
 }
 
 // UpdatePin updates a recursive pin to a new CID, unpinning old content.
-func UpdatePin(from, to string) {
+func UpdatePin(from, to string, nocopy bool) {
 	_, err := doRequest(0, "pin/update?arg="+url.QueryEscape(from)+"&arg="+url.QueryEscape(to)) // no timeout
 	if err != nil {
 		log.Println("Error updating pin:", err)
 		if Verbose {
 			log.Println("From CID:", from, "To CID:", to)
 		}
-		if HandleBadBlockError(err) {
+		if HandleBadBlockError(err, "", nocopy) {
 			if Verbose {
 				log.Println("Bad blocks found, running pin/update again (recursive)")
 			}
-			UpdatePin(from, to)
+			UpdatePin(from, to, nocopy)
 			return
 		}
 		err = Pin(to)
@@ -538,7 +632,6 @@ func PinEstuary(cid, name string) error {
 }
 
 func UpdatePinEstuary(oldcid, newcid, name string) {
-	log.Println("[DEBUG] Estuary update:", oldcid, newcid, name)
 	resp, err := doEstuaryRequest("GET", "pinning/pins?cid="+oldcid, nil)
 	if err != nil {
 		log.Println("Error getting Estuary pin:", err)
@@ -668,7 +761,7 @@ func WatchDog() {
 			if fCID := GetFileCID(dk.MFSPath); len(fCID) > 0 && fCID != dk.CID {
 				// log.Printf("[DEBUG] '%s' != '%s'", fCID, dk.CID)
 				if dk.Pin {
-					UpdatePin(dk.CID, fCID)
+					UpdatePin(dk.CID, fCID, dk.Nocopy)
 				}
 				if dk.Estuary {
 					UpdatePinEstuary(dk.CID, fCID, strings.Split(dk.MFSPath, "/")[0])
@@ -690,7 +783,9 @@ func main() {
 	for _, dk := range DirKeys {
 		if dk.Nocopy {
 			// Cleanup filestore first.
-			CleanFilestore()
+			if VerifyFilestore {
+				CleanFilestore()
+			}
 			break
 		}
 	}

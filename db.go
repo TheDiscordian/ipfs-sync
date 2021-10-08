@@ -122,7 +122,7 @@ func HashDir(path string, dontHash bool) (map[string]*FileHash, error) {
 	hashes := make(map[string]*FileHash, len(files))
 	for _, file := range files {
 		if Verbose {
-			log.Println("Hashing", file, "...")
+			log.Println("Loading", file, "...")
 		}
 		splitName := strings.Split(file, ".")
 		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
@@ -132,10 +132,10 @@ func HashDir(path string, dontHash bool) (map[string]*FileHash, error) {
 		// Load existing data from DB
 		var hash, timestamp []byte
 		if !dontHash {
-			hash, _ = DB.Get([]byte(path), nil)
+			hash, _ = DB.Get([]byte(file), nil)
 		}
-		timestamp, _ = DB.Get([]byte("ts_"+path), nil)
-		fh := &FileHash{PathOnDisk: path, Hash: hash, FakeHash: timestamp}
+		timestamp, _ = DB.Get([]byte("ts_"+file), nil)
+		fh := &FileHash{PathOnDisk: file, Hash: hash, FakeHash: timestamp}
 		fh.Recalculate(file, dontHash) // Recalculate using info from DB (avoiding rehash if possible)
 		hashes[file] = fh
 	}

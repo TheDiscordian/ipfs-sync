@@ -14,29 +14,31 @@ import (
 )
 
 var (
-	BasePathFlag     = flag.String("basepath", "/ipfs-sync/", "relative MFS directory path")
-	BasePath         string
-	EndPointFlag     = flag.String("endpoint", "http://127.0.0.1:5001", "node to connect to over HTTP")
-	EndPoint         string
-	DirKeysFlag      = new(SyncDirs)
-	DirKeys          []*DirKey
-	SyncTimeFlag     = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
-	SyncTime         time.Duration
-	TimeoutTimeFlag  = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like 'version' and 'files/mkdir' (ex: 60s)")
-	TimeoutTime      time.Duration
-	ConfigFileFlag   = flag.String("config", getHomeDir()+".ipfs-sync.yaml", "path to config file to use")
-	ConfigFile       string
-	IgnoreFlag       = new(IgnoreStruct)
-	Ignore           []string
-	LicenseFlag      = flag.Bool("copyright", false, "display copyright and exit")
-	DBPathFlag       = flag.String("db", getHomeDir()+".ipfs-sync.db", `path to file where db should be stored`)
-	DBPath           string
-	IgnoreHiddenFlag = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
-	IgnoreHidden     bool
-	VersionFlag      = flag.Bool("version", false, "display version and exit")
-	VerboseFlag      = flag.Bool("v", false, "display verbose output")
-	Verbose          bool
-	EstuaryAPIKey    string // don't make this a flag
+	BasePathFlag        = flag.String("basepath", "/ipfs-sync/", "relative MFS directory path")
+	BasePath            string
+	EndPointFlag        = flag.String("endpoint", "http://127.0.0.1:5001", "node to connect to over HTTP")
+	EndPoint            string
+	DirKeysFlag         = new(SyncDirs)
+	DirKeys             []*DirKey
+	SyncTimeFlag        = flag.Duration("sync", time.Second*10, "time to sleep between IPNS syncs (ex: 120s)")
+	SyncTime            time.Duration
+	TimeoutTimeFlag     = flag.Duration("timeout", time.Second*30, "longest time to wait for API calls like 'version' and 'files/mkdir' (ex: 60s)")
+	TimeoutTime         time.Duration
+	ConfigFileFlag      = flag.String("config", getHomeDir()+".ipfs-sync.yaml", "path to config file to use")
+	ConfigFile          string
+	IgnoreFlag          = new(IgnoreStruct)
+	Ignore              []string
+	LicenseFlag         = flag.Bool("copyright", false, "display copyright and exit")
+	DBPathFlag          = flag.String("db", getHomeDir()+".ipfs-sync.db", `path to file where db should be stored`)
+	DBPath              string
+	IgnoreHiddenFlag    = flag.Bool("ignorehidden", false, `ignore anything prefixed with "."`)
+	IgnoreHidden        bool
+	VersionFlag         = flag.Bool("version", false, "display version and exit")
+	VerboseFlag         = flag.Bool("v", false, "display verbose output")
+	Verbose             bool
+	EstuaryAPIKey       string // don't make this a flag
+	VerifyFilestoreFlag = flag.Bool("verify", false, "verify filestore on startup (not recommended unless you're having issues)")
+	VerifyFilestore     bool
 
 	version string // passed by -ldflags
 )
@@ -107,15 +109,16 @@ func (ig *IgnoreStruct) String() string {
 
 // ConfigFileStruct is used for loading information from the config file.
 type ConfigFileStruct struct {
-	BasePath      string    `yaml:"BasePath"`
-	EndPoint      string    `yaml:"EndPoint"`
-	Dirs          []*DirKey `yaml:"Dirs"`
-	Sync          string    `yaml:"Sync"`
-	Ignore        []string  `yaml:"Ignore"`
-	DB            string    `yaml:"DB"`
-	IgnoreHidden  bool      `yaml:"IgnoreHidden"`
-	Timeout       string    `yaml:"Timeout"`
-	EstuaryAPIKey string    `yaml:"EstuaryAPIKey"`
+	BasePath        string    `yaml:"BasePath"`
+	EndPoint        string    `yaml:"EndPoint"`
+	Dirs            []*DirKey `yaml:"Dirs"`
+	Sync            string    `yaml:"Sync"`
+	Ignore          []string  `yaml:"Ignore"`
+	DB              string    `yaml:"DB"`
+	IgnoreHidden    bool      `yaml:"IgnoreHidden"`
+	Timeout         string    `yaml:"Timeout"`
+	EstuaryAPIKey   string    `yaml:"EstuaryAPIKey"`
+	VerifyFilestore bool      `yaml:"VerifyFilestore"`
 }
 
 func loadConfig(path string) {
@@ -177,6 +180,7 @@ func loadConfig(path string) {
 	}
 	IgnoreHidden = cfg.IgnoreHidden
 	EstuaryAPIKey = cfg.EstuaryAPIKey
+	VerifyFilestore = cfg.VerifyFilestore
 }
 
 // Process flags, and load config.
@@ -249,6 +253,9 @@ func ProcessFlags() {
 	}
 	if *IgnoreHiddenFlag {
 		IgnoreHidden = true
+	}
+	if *VerifyFilestoreFlag {
+		VerifyFilestore = true
 	}
 	Verbose = *VerboseFlag
 
