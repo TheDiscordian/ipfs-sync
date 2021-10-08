@@ -6,13 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"io/ioutil"
 	"log"
-	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -174,28 +171,18 @@ func IPFSAddFile(fpath string, nocopy, onlyhash bool) (*HashStruct, error) {
 	}
 	defer f.Close()
 
-	buff := &bytes.Buffer{}
-	writer := multipart.NewWriter(buff)
-
-	h := make(textproto.MIMEHeader)
-	h.Set("Abspath", fpath)
-	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", url.QueryEscape(f.Name())))
-	h.Set("Content-Type", "application/octet-stream")
-	part, _ := writer.CreatePart(h)
 	if Verbose {
-		log.Println("Generating file headers...")
+		log.Println("Generating request...")
 	}
 
-	io.Copy(part, f)
-
-	writer.Close()
-
 	c := &http.Client{}
-	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true&only-hash=%t`, nocopy, onlyhash), buff)
+	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true&only-hash=%t`, nocopy, onlyhash), f)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Content-Type", writer.FormDataContentType())
+	req.Header.Add("Abspath", fpath)
+	req.Header.Add("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", url.QueryEscape(f.Name())))
+	req.Header.Add("Content-Type", "application/octet-stream")
 
 	if Verbose {
 		log.Println("Doing add request...")
