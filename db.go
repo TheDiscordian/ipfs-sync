@@ -24,6 +24,7 @@ var (
 type FileHash struct {
 	PathOnDisk string
 	Hash       []byte
+	FakeHash   []byte // timestamp
 }
 
 // Update cross-references the hash at PathOnDisk with the one in the db, updating if necessary. Returns true if updated.
@@ -31,12 +32,23 @@ func (fh *FileHash) Update() bool {
 	if DB == nil || fh == nil {
 		return false
 	}
-	dbhash, err := DB.Get([]byte(fh.PathOnDisk), nil)
-	if err != nil || string(dbhash) != string(fh.Hash) {
-		DB.Put([]byte(fh.PathOnDisk), fh.Hash, nil)
-		return true
+	var tsChanged bool
+	var hashChanged bool
+	if fh.Hash != nil {
+		dbhash, err := DB.Get([]byte(fh.PathOnDisk), nil)
+		if err != nil || string(dbhash) != string(fh.Hash) {
+			DB.Put([]byte(fh.PathOnDisk), fh.Hash, nil)
+			hashChanged = true
+		}
+	} else {
+		hashChanged = true
 	}
-	return false
+	dbts, err := DB.Get([]byte("ts_"+fh.PathOnDisk), nil)
+	if err != nil || string(dbts) != string(fh.FakeHash) {
+		DB.Put([]byte("ts_"+fh.PathOnDisk), fh.FakeHash, nil)
+		tsChanged = true
+	}
+	return hashChanged && tsChanged
 }
 
 // Delete removes the PathOnFisk:Hash from the db, works with directories. path is used in case fh is nil (directory)
@@ -54,6 +66,7 @@ func (fh *FileHash) Delete(path string) {
 			log.Println("Deleting", string(path), "from DB ...")
 		}
 		DB.Delete(path, nil)
+		DB.Delete([]byte("ts_"+string(path)), nil)
 		delete(Hashes, string(path))
 	}
 	iter.Release()
@@ -62,7 +75,13 @@ func (fh *FileHash) Delete(path string) {
 // Recalculate simply recalculates the Hash, updating Hash and PathOnDisk, and returning a copy of the pointer.
 func (fh *FileHash) Recalculate(PathOnDisk string, dontHash bool) *FileHash {
 	fh.PathOnDisk = PathOnDisk
-	fh.Hash = GetHashValue(PathOnDisk, dontHash)
+	timestamp := GetHashValue(PathOnDisk, true)
+	if string(timestamp) != string(fh.FakeHash) {
+		fh.FakeHash = timestamp
+		if !dontHash {
+			fh.Hash = GetHashValue(PathOnDisk, false)
+		}
+	}
 	return fh
 }
 
@@ -109,7 +128,16 @@ func HashDir(path string, dontHash bool) (map[string]*FileHash, error) {
 		if findInStringSlice(Ignore, splitName[len(splitName)-1]) > -1 {
 			continue
 		}
-		hashes[file] = &FileHash{PathOnDisk: file, Hash: GetHashValue(file, dontHash)}
+
+		// Load existing data from DB
+		var hash, timestamp []byte
+		if !dontHash {
+			hash, _ = DB.Get([]byte(path), nil)
+		}
+		timestamp, _ = DB.Get([]byte("ts_"+path), nil)
+		fh := &FileHash{PathOnDisk: path, Hash: hash, FakeHash: timestamp}
+		fh.Recalculate(file, dontHash) // Recalculate using info from DB (avoiding rehash if possible)
+		hashes[file] = fh
 	}
 	return hashes, nil
 }
