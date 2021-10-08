@@ -185,9 +185,12 @@ func IPFSAddFile(fpath string, nocopy, onlyhash bool) (*HashStruct, error) {
 	if Verbose {
 		log.Println("Generating file headers...")
 	}
-	io.Copy(part, f)
 
-	writer.Close()
+	go func() {
+		io.Copy(part, f)
+
+		writer.Close()
+	}()
 
 	c := &http.Client{}
 	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true&only-hash=%t`, nocopy, onlyhash), buff)
