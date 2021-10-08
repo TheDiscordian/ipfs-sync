@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"io/ioutil"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -165,46 +168,64 @@ func AddDir(path string, nocopy bool, pin bool, estuary bool) (string, error) {
 
 // A simple IPFS add, if onlyhash is true, only the CID is generated and returned
 func IPFSAddFile(fpath string, nocopy, onlyhash bool) (*HashStruct, error) {
+	client := http.Client{}
 	f, err := os.Open(fpath)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
 
-	if Verbose {
-		log.Println("Generating request...")
-	}
+	pr, pw := io.Pipe()
+	writer := multipart.NewWriter(pw)
 
-	c := &http.Client{}
-	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true&only-hash=%t`, nocopy, onlyhash), f)
+	defer pr.Close()
+
+	req, err := http.NewRequest("POST", EndPoint+API+fmt.Sprintf(`add?nocopy=%t&pin=false&quieter=true&only-hash=%t`, nocopy, onlyhash), pr)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("Abspath", fpath)
-	req.Header.Add("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", url.QueryEscape(f.Name())))
-	req.Header.Add("Content-Type", "application/octet-stream")
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+
+	go func() {
+		defer f.Close()
+		defer writer.Close()
+
+		h := make(textproto.MIMEHeader)
+		h.Set("Abspath", fpath)
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, "file", url.QueryEscape(f.Name())))
+		h.Set("Content-Type", "application/octet-stream")
+
+		part, err := writer.CreatePart(h)
+		if err != nil {
+			pw.CloseWithError(err)
+			return
+		}
+
+		if Verbose {
+			log.Println("Generating file headers...")
+		}
+
+		_, err = io.Copy(part, f)
+		pw.CloseWithError(err)
+	}()
 
 	if Verbose {
 		log.Println("Doing add request...")
 	}
-	resp, err := c.Do(req)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	dec := json.NewDecoder(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 
-	hash := new(HashStruct)
-	err = dec.Decode(&hash)
+	var hash HashStruct
+	err = json.NewDecoder(resp.Body).Decode(&hash)
 
 	if Verbose {
 		log.Println("File hash:", hash.Hash)
 	}
 
-	return hash, err
+	return &hash, err
 }
 
 // AddFile adds a file to the MFS relative to BasePath. from should be the full path to the file intended to be added.
