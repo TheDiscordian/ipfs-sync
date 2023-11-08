@@ -36,7 +36,6 @@ var (
 	VersionFlag         = flag.Bool("version", false, "display version and exit")
 	VerboseFlag         = flag.Bool("v", false, "display verbose output")
 	Verbose             bool
-	EstuaryAPIKey       string // don't make this a flag
 	VerifyFilestoreFlag = flag.Bool("verify", false, "verify filestore on startup (not recommended unless you're having issues)")
 	VerifyFilestore     bool
 
@@ -64,7 +63,6 @@ type DirKey struct {
 	Nocopy   bool   `yaml:"Nocopy"`
 	DontHash bool   `yaml:"DontHash"`
 	Pin      bool   `yaml:"Pin"`
-	Estuary  bool   `yaml:"Estuary"`
 
 	// probably best to let this be managed automatically
 	CID     string
@@ -117,7 +115,6 @@ type ConfigFileStruct struct {
 	DB              string    `yaml:"DB"`
 	IgnoreHidden    bool      `yaml:"IgnoreHidden"`
 	Timeout         string    `yaml:"Timeout"`
-	EstuaryAPIKey   string    `yaml:"EstuaryAPIKey"`
 	VerifyFilestore bool      `yaml:"VerifyFilestore"`
 }
 
@@ -179,7 +176,6 @@ func loadConfig(path string) {
 		DBPath = cfg.DB
 	}
 	IgnoreHidden = cfg.IgnoreHidden
-	EstuaryAPIKey = cfg.EstuaryAPIKey
 	VerifyFilestore = cfg.VerifyFilestore
 }
 

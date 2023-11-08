@@ -23,16 +23,11 @@ Dirs:
 #    DontHash: false
 ## If true, will pin the root directory
 #    Pin: false
-## If true, and EstuaryAPIKey is set, will attempt to pin the CID via Estuary as well
-#    Estuary: false
 #  - ID: Example2
 #    Dir: /home/user/Pictures/
 #    Nocopy: false
 #    DontHash: false
 #    Pin: false
-
-# API key for Estuary (optional, find out more at https://estuary.tech)
-EstuaryAPIKey:
 
 # Relative MFS directory path (default "/ipfs-sync/")
 BasePath: /ipfs-sync/
