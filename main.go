@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -122,7 +121,7 @@ func filePathWalkDir(root string) ([]string, error) {
 }
 
 // AddDir adds a directory, and returns CID.
-func AddDir(path string, nocopy bool, pin bool, estuary bool) (string, error) {
+func AddDir(path string, nocopy bool, pin bool) (string, error) {
 	pathSplit := strings.Split(path, string(os.PathSeparator))
 	dirName := pathSplit[len(pathSplit)-2]
 	files, err := filePathWalkDir(path)
@@ -157,11 +156,6 @@ func AddDir(path string, nocopy bool, pin bool, estuary bool) (string, error) {
 	if pin {
 		err := Pin(cid)
 		log.Println("Error pinning", dirName, ":", err)
-	}
-	if estuary {
-		if err := PinEstuary(cid, dirName); err != nil {
-			log.Println("Error pinning to Estuary:", err)
-		}
 	}
 	return cid, err
 }
@@ -567,11 +561,6 @@ func Publish(cid, key string) error {
 	return err
 }
 
-type EstuaryFile struct {
-	Cid  string
-	Name string
-}
-
 type IPFSRemotePinningResponse struct {
 	Count   int
 	Results []*IPFSRemotePinResult
@@ -584,98 +573,6 @@ type IPFSRemotePinResult struct {
 
 type IPFSRemotePin struct {
 	Cid string
-}
-
-func doEstuaryRequest(reqType, cmd string, jsonData []byte) (string, error) {
-	if EstuaryAPIKey == "" {
-		return "", errors.New("Estuary API key is blank.")
-	}
-	var cancel context.CancelFunc
-	ctx := context.Background()
-	if TimeoutTime > 0 {
-		ctx, cancel = context.WithTimeout(ctx, TimeoutTime)
-		defer cancel()
-	}
-	c := &http.Client{}
-
-	var (
-		req *http.Request
-		err error
-	)
-	if jsonData != nil {
-		req, err = http.NewRequestWithContext(ctx, reqType, "https://api.estuary.tech/"+cmd, bytes.NewBuffer(jsonData))
-	} else {
-		req, err = http.NewRequestWithContext(ctx, reqType, "https://api.estuary.tech/"+cmd, nil)
-	}
-	if err != nil {
-		return "", err
-	}
-
-	req.Header.Add("Authorization", "Bearer "+EstuaryAPIKey)
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := c.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	errStruct := new(ErrorStruct)
-	err = json.Unmarshal(body, errStruct)
-	if err == nil {
-		if errStruct.Error() != "" {
-			return string(body), errStruct
-		}
-	}
-
-	return string(body), nil
-}
-
-func PinEstuary(cid, name string) error {
-	jsonData, _ := json.Marshal(&EstuaryFile{Cid: cid, Name: name})
-	_, err := doEstuaryRequest("POST", "pinning/pins", jsonData)
-	return err
-}
-
-func UpdatePinEstuary(oldcid, newcid, name string) {
-	resp, err := doEstuaryRequest("GET", "pinning/pins?cid="+oldcid, nil)
-	if err != nil {
-		log.Println("Error getting Estuary pin:", err)
-		return
-	}
-	pinResp := new(IPFSRemotePinningResponse)
-	err = json.Unmarshal([]byte(resp), pinResp)
-	if err != nil {
-		log.Println("Error decoding Estuary pin list:", err)
-		return
-	}
-	// FIXME Estuary doesn't seem to support `cid` GET field yet, this code can be removed when it does:
-	var reqId string
-	pinResp.Count = 0
-	for _, pinResult := range pinResp.Results {
-		if pinResult.Pin.Cid == oldcid {
-			reqId = pinResult.RequestId
-			pinResp.Count = 1
-			break
-		}
-	}
-	// END OF FIXME
-	jsonData, _ := json.Marshal(&EstuaryFile{Cid: newcid, Name: name})
-	if pinResp.Count > 0 {
-		_, err := doEstuaryRequest("POST", "pinning/pins/"+reqId, jsonData)
-		if err != nil {
-			log.Println("Error updating Estuary pin:", err)
-		} else {
-			return
-		}
-	}
-	err = PinEstuary(newcid, name)
-	if err != nil {
-		log.Println("Error pinning to Estuary:", err)
-	}
 }
 
 // WatchDog watches for directory updates, periodically updates IPNS records, and updates recursive pins.
@@ -754,7 +651,7 @@ func WatchDog() {
 		log.Println(dk.ID, "not found, generating...")
 		ik := GenerateKey(dk.ID)
 		var err error
-		dk.CID, err = AddDir(dk.Dir, dk.Nocopy, dk.Pin, dk.Estuary)
+		dk.CID, err = AddDir(dk.Dir, dk.Nocopy, dk.Pin)
 		if err != nil {
 			log.Panicln("[ERROR] Failed to add directory:", err)
 		}
@@ -771,9 +668,6 @@ func WatchDog() {
 				// log.Printf("[DEBUG] '%s' != '%s'", fCID, dk.CID)
 				if dk.Pin {
 					UpdatePin(dk.CID, fCID, dk.Nocopy)
-				}
-				if dk.Estuary {
-					UpdatePinEstuary(dk.CID, fCID, strings.Split(dk.MFSPath, "/")[0])
 				}
 				Publish(fCID, dk.ID)
 				dk.CID = fCID
